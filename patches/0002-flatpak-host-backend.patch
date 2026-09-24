@@ -1,0 +1,176 @@
+diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
+index a36902304..77f8ab9a8 100644
+--- a/apps/desktop/src/backend/DesktopBackendConfiguration.ts
++++ b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
+@@ -1,5 +1,8 @@
+ import * as NodeOS from "node:os";
+ 
++import { flatpakAppId } from "../app/Flatpak.ts";
++import { flatpakBackendConfig } from "./flatpakBackend.ts";
++
+ import { parsePersistedServerObservabilitySettings } from "@t3tools/shared/serverSettings";
+ import * as Context from "effect/Context";
+ import * as Crypto from "effect/Crypto";
+@@ -522,7 +525,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
+       ...buildObservabilityFragment(input.observabilitySettings),
+     };
+ 
+-    return {
++    const config = {
+       executablePath: process.execPath,
+       args: [environment.backendEntryPath, "--bootstrap-fd", "3"],
+       entryPath: environment.backendEntryPath,
+@@ -539,6 +542,15 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
+       captureOutput: true,
+       preflightFailure: Option.none(),
+     } satisfies DesktopBackendManager.DesktopBackendStartConfig;
++
++    if (flatpakAppId(process.env, environment.platform) !== null) {
++      return flatpakBackendConfig(
++        config,
++        process.env.T3CODE_FLATPAK_RUNTIME,
++        process.env.T3CODE_FLATPAK_HOST_PATH,
++      );
++    }
++    return config;
+   },
+ );
+ 
+diff --git a/apps/desktop/src/backend/flatpakBackend.test.ts b/apps/desktop/src/backend/flatpakBackend.test.ts
+new file mode 100644
+index 000000000..54790debe
+--- /dev/null
++++ b/apps/desktop/src/backend/flatpakBackend.test.ts
+@@ -0,0 +1,75 @@
++import { assert, describe, it } from "@effect/vitest";
++import * as Option from "effect/Option";
++
++import type { DesktopBackendStartConfig } from "./DesktopBackendManager.ts";
++import { flatpakBackendConfig } from "./flatpakBackend.ts";
++
++const config: DesktopBackendStartConfig = {
++  executablePath: "/app/t3code/t3code",
++  entryPath: "/app/server/bin.mjs",
++  args: ["/app/server/bin.mjs", "--bootstrap-fd", "3"],
++  cwd: "/home/alice",
++  env: { ELECTRON_RUN_AS_NODE: "1" },
++  extendEnv: true,
++  bootstrap: {
++    mode: "desktop",
++    noBrowser: true,
++    port: 12345,
++    host: "127.0.0.1",
++    t3Home: "/home/alice/.var/app/com.t3tools.T3Code.Flatpak/data/t3",
++    desktopBootstrapToken: "test-token",
++    tailscaleServeEnabled: false,
++    tailscaleServePort: 443,
++    desktopTelemetryFd: 4,
++    desktopTelemetryControlFd: 5,
++    resourceMonitorPath: "/app/resources/resource-monitor/t3-resource-monitor",
++  },
++  bootstrapDelivery: "fd3",
++  httpBaseUrl: new URL("http://127.0.0.1:12345"),
++  captureOutput: true,
++  preflightFailure: Option.none(),
++};
++
++describe("Flatpak backend", () => {
++  it("keeps bootstrap and telemetry on forwarded FDs without exporting the sandbox environment", () => {
++    const runtime = "/home/al ice/.var/app/t3/data/runtimes/build-$literal";
++    const result = flatpakBackendConfig(
++      config,
++      runtime,
++      "/home/alice/.local/bin:/usr/bin",
++    );
++    assert.equal(result.executablePath, "/usr/bin/flatpak-spawn");
++    assert.deepEqual(result.args, [
++      "--host",
++      "--watch-bus",
++      "--forward-fd=3",
++      "--forward-fd=4",
++      "--forward-fd=5",
++      `--directory=${runtime}`,
++      `--env=T3CODE_HOME=${config.bootstrap.t3Home}`,
++      `--env=T3CODE_FLATPAK_SERVER=${runtime}/t3code`,
++      `--env=T3CODE_FLATPAK_ENTRY=${runtime}/resources/app.asar/apps/server/dist/bin.mjs`,
++      "--env=PATH=/home/alice/.local/bin:/usr/bin",
++      "/bin/sh",
++      `${runtime}/host-server.sh`,
++    ]);
++    assert.deepEqual(result.env, {});
++    assert.equal(result.bootstrapDelivery, "fd3");
++    assert.equal(result.bootstrap.desktopBootstrapToken, "test-token");
++    assert.equal(result.bootstrap.desktopTelemetryFd, 4);
++    assert.equal(result.bootstrap.desktopTelemetryControlFd, 5);
++    assert.equal(
++      result.bootstrap.resourceMonitorPath,
++      `${runtime}/resources/resource-monitor/t3-resource-monitor`,
++    );
++    assert.equal(result.httpBaseUrl, config.httpBaseUrl);
++  });
++
++  it("fails preflight instead of falling back to a sandbox backend when staging is missing", () => {
++    for (const runtime of [undefined, "", "relative/runtime"]) {
++      const failure = Option.getOrThrow(flatpakBackendConfig(config, runtime).preflightFailure);
++      assert.isTrue(failure.fatal);
++      assert.include(failure.reason, "Flatpak launcher");
++    }
++  });
++});
+diff --git a/apps/desktop/src/backend/flatpakBackend.ts b/apps/desktop/src/backend/flatpakBackend.ts
+new file mode 100644
+index 000000000..923013ebe
+--- /dev/null
++++ b/apps/desktop/src/backend/flatpakBackend.ts
+@@ -0,0 +1,51 @@
++import * as Option from "effect/Option";
++
++import type { DesktopBackendStartConfig } from "./DesktopBackendManager.ts";
++
++/** Launch the package's staged server through the host session, preserving desktop bootstrap FDs. */
++export function flatpakBackendConfig(
++  config: DesktopBackendStartConfig,
++  runtimeDir: string | undefined,
++  hostPath?: string,
++): DesktopBackendStartConfig {
++  if (!runtimeDir?.startsWith("/")) {
++    return {
++      ...config,
++      preflightFailure: Option.some({
++        reason: "The Flatpak server runtime is missing. Start T3 Code using its Flatpak launcher.",
++        fatal: true,
++      }),
++    };
++  }
++
++  // /app and Electron's resource paths do not exist in the host namespace.
++  const bootstrap = {
++    ...config.bootstrap,
++    resourceMonitorPath: `${runtimeDir}/resources/resource-monitor/t3-resource-monitor`,
++  };
++  return {
++    ...config,
++    executablePath: "/usr/bin/flatpak-spawn",
++    args: [
++      "--host",
++      "--watch-bus",
++      "--forward-fd=3",
++      "--forward-fd=4",
++      "--forward-fd=5",
++      `--directory=${runtimeDir}`,
++      `--env=T3CODE_HOME=${bootstrap.t3Home}`,
++      `--env=T3CODE_FLATPAK_SERVER=${runtimeDir}/t3code`,
++      `--env=T3CODE_FLATPAK_ENTRY=${runtimeDir}/resources/app.asar/apps/server/dist/bin.mjs`,
++      ...(hostPath?.trim() ? [`--env=PATH=${hostPath}`] : []),
++      "/bin/sh",
++      `${runtimeDir}/host-server.sh`,
++    ],
++    entryPath: `${runtimeDir}/resources/app.asar/apps/server/dist/bin.mjs`,
++    cwd: runtimeDir,
++    // This environment belongs to flatpak-spawn. Only its explicit --env
++    // arguments cross to the host; the rest comes from the host session.
++    env: {},
++    extendEnv: true,
++    bootstrap,
++  };
++}

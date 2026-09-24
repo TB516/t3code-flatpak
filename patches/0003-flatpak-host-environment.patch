@@ -1,0 +1,125 @@
+diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
+index 5a76402b1..ed1e339c7 100644
+--- a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
++++ b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
+@@ -100,6 +100,21 @@ function runShellEnvironment(input: {
+ }
+ 
+ describe("DesktopShellEnvironment", () => {
++  it.effect("leaves the Flatpak environment intact without starting a login shell", () => {
++    const env = {
++      FLATPAK_ID: "com.t3tools.T3Code.Flatpak",
++      PATH: "/app/bin:/usr/bin",
++      HOME: "/home/alice",
++    };
++    return runShellEnvironment({
++      env,
++      platform: "linux",
++      handler: () => {
++        throw new Error("Flatpak desktop must not probe a host shell");
++      },
++    }).pipe(Effect.tap(() => Effect.sync(() => assert.equal(env.PATH, "/app/bin:/usr/bin"))));
++  });
++
+   it.effect("hydrates PATH and missing SSH_AUTH_SOCK from the login shell on macOS", () =>
+     Effect.gen(function* () {
+       const env: NodeJS.ProcessEnv = {
+diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.ts b/apps/desktop/src/shell/DesktopShellEnvironment.ts
+index 5c6b67fd5..e9f5ce1b9 100644
+--- a/apps/desktop/src/shell/DesktopShellEnvironment.ts
++++ b/apps/desktop/src/shell/DesktopShellEnvironment.ts
+@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
+ import * as ChildProcess from "effect/unstable/process/ChildProcess";
+ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+ 
++import { flatpakAppId } from "../app/Flatpak.ts";
+ import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+ 
+ type EnvironmentPatch = Record<string, string>;
+@@ -524,6 +525,7 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
+ const installShellEnvironment = (
+   config: ShellEnvironmentConfig,
+ ): Effect.Effect<void, never, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> => {
++  if (flatpakAppId(config.env, config.platform) !== null) return Effect.void;
+   if (config.platform === "win32") {
+     return installWindowsEnvironment(config);
+   }
+diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
+index 509778521..7b23c3382 100644
+--- a/apps/desktop/src/updates/DesktopUpdates.test.ts
++++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
+@@ -1,4 +1,4 @@
+-import { assert, describe, it } from "@effect/vitest";
++import { assert, describe, it, vi } from "@effect/vitest";
+ import * as Cause from "effect/Cause";
+ import * as Deferred from "effect/Deferred";
+ import * as Duration from "effect/Duration";
+@@ -19,6 +19,28 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
+ import { flushCallbacks, makeHarness } from "./updatesTestHarness.ts";
+ 
+ describe("DesktopUpdates", () => {
++  it.effect("leaves updates to Flatpak even when an update feed is configured", () => {
++    vi.stubEnv("FLATPAK_ID", "com.t3tools.T3Code.Flatpak");
++    const harness = makeHarness({ platform: "linux" });
++    return Effect.gen(function* () {
++      const updates = yield* DesktopUpdates.DesktopUpdates;
++      yield* updates.configure;
++      const state = yield* updates.getState;
++      assert.isFalse(state.enabled);
++      assert.equal(
++        Option.getOrThrow(yield* updates.disabledReason),
++        "Updates are managed by Flatpak.",
++      );
++      const result = yield* updates.check("manual");
++      assert.isFalse(result.checked);
++      assert.equal(harness.checkCount(), 0);
++    }).pipe(
++      Effect.scoped,
++      Effect.provide(harness.layer),
++      Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs())),
++    );
++  });
++
+   it("preserves complete causes for update poller and event failures", () => {
+     const cause = Cause.combine(
+       Cause.fail(new Error("updater failed")),
+diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
+index c35b52e83..edfc0a9ea 100644
+--- a/apps/desktop/src/updates/DesktopUpdates.ts
++++ b/apps/desktop/src/updates/DesktopUpdates.ts
+@@ -1,3 +1,4 @@
++import { flatpakAppId } from "../app/Flatpak.ts";
+ import {
+   DesktopUpdateChannelSchema,
+   type DesktopRuntimeInfo,
+@@ -252,6 +253,9 @@ function getAutoUpdateDisabledReason(args: {
+   disabledByEnv: boolean;
+   hasUpdateFeedConfig: boolean;
+ }): string | null {
++  if (flatpakAppId(process.env, args.platform) !== null) {
++    return "Updates are managed by Flatpak.";
++  }
+   if (!args.hasUpdateFeedConfig) {
+     return "Automatic updates are not available because no update feed is configured.";
+   }
+diff --git a/apps/desktop/src/updates/updatesTestHarness.ts b/apps/desktop/src/updates/updatesTestHarness.ts
+index fbcbb349f..c9383ee84 100644
+--- a/apps/desktop/src/updates/updatesTestHarness.ts
++++ b/apps/desktop/src/updates/updatesTestHarness.ts
+@@ -20,6 +20,7 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
+ export const flushCallbacks = Effect.yieldNow;
+ 
+ export interface UpdatesHarnessOptions {
++  readonly platform?: NodeJS.Platform;
+   readonly checkForUpdates?: Effect.Effect<
+     void,
+     ElectronUpdater.ElectronUpdaterCheckForUpdatesError
+@@ -145,7 +146,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
+   const environmentLayer = DesktopEnvironment.layer({
+     dirname: "/repo/apps/desktop/src",
+     homeDirectory: `/tmp/t3-desktop-updates-home-${process.pid}`,
+-    platform: "darwin",
++    platform: options.platform ?? "darwin",
+     processArch: "x64",
+     appVersion: "1.2.3",
+     appPath: "/repo",

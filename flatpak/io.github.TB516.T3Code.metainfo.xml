@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.TB516.T3Code</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>T3 Code (Flatpak)</name>
+  <summary>Work with coding agents on your machine</summary>
+  <description>
+    <p>An unofficial Flatpak package for T3 Code. The desktop runs inside
+    Flatpak and starts its matching T3 server on the host, where coding agents
+    can use your projects and development tools.</p>
+  </description>
+  <launchable type="desktop-id">io.github.TB516.T3Code.desktop</launchable>
+  <url type="homepage">https://t3.codes</url>
+  <releases>
+    <release version="0.0.42" date="2026-09-19" />
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

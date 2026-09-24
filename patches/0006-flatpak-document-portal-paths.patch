@@ -1,0 +1,187 @@
+diff --git a/apps/desktop/src/electron/ElectronDialog.test.ts b/apps/desktop/src/electron/ElectronDialog.test.ts
+index 2ed5a1f2f..321003f9f 100644
+--- a/apps/desktop/src/electron/ElectronDialog.test.ts
++++ b/apps/desktop/src/electron/ElectronDialog.test.ts
+@@ -3,7 +3,7 @@ import * as Cause from "effect/Cause";
+ import * as Effect from "effect/Effect";
+ import * as Option from "effect/Option";
+ import type { BrowserWindow } from "electron";
+-import { beforeEach, vi } from "vite-plus/test";
++import { afterEach, beforeEach, vi } from "vite-plus/test";
+ 
+ import * as ElectronDialog from "./ElectronDialog.ts";
+ 
+@@ -12,6 +12,9 @@ const { showMessageBoxMock, showOpenDialogMock, showErrorBoxMock } = vi.hoisted(
+   showOpenDialogMock: vi.fn(),
+   showErrorBoxMock: vi.fn(),
+ }));
++const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn() }));
++
++vi.mock("node:child_process", () => ({ execFile: execFileMock }));
+ 
+ vi.mock("electron", () => ({
+   dialog: {
+@@ -26,8 +29,69 @@ describe("ElectronDialog", () => {
+     showMessageBoxMock.mockReset();
+     showOpenDialogMock.mockReset();
+     showErrorBoxMock.mockReset();
++    execFileMock.mockReset();
+   });
+ 
++  afterEach(() => vi.unstubAllEnvs());
++
++  it.effect("returns the host path for a Flatpak folder picker selection", () =>
++    Effect.gen(function* () {
++      vi.stubEnv("FLATPAK_ID", "io.github.TB516.T3Code");
++      vi.stubEnv("XDG_RUNTIME_DIR", "/run/user/1000");
++      showOpenDialogMock.mockResolvedValue({
++        canceled: false,
++        filePaths: ["/run/user/1000/doc/document-id/packslip-packages"],
++      });
++      execFileMock.mockImplementation((...args: unknown[]) => {
++        const callback = args.at(-1) as (error: null, stdout: string, stderr: string) => void;
++        callback(null, "id: document-id\norigin: /home/alice/Projects/packslip-packages\n", "");
++      });
++      const dialog = yield* ElectronDialog.ElectronDialog;
++
++      const path = yield* dialog.pickFolder({
++        owner: Option.none(),
++        defaultPath: Option.none(),
++      });
++
++      assert.equal(Option.getOrThrow(path), "/home/alice/Projects/packslip-packages");
++      assert.deepEqual(execFileMock.mock.calls[0]?.slice(0, 2), [
++        "/usr/bin/flatpak-spawn",
++        [
++          "--host",
++          "--directory=/",
++          "--env=LC_ALL=C",
++          "/usr/bin/flatpak",
++          "document-info",
++          "/run/user/1000/doc/document-id/packslip-packages",
++        ],
++      ]);
++    }).pipe(Effect.provide(ElectronDialog.layer)),
++  );
++
++  it.effect("reports an unresolved Flatpak folder through the typed picker error", () =>
++    Effect.gen(function* () {
++      vi.stubEnv("FLATPAK_ID", "io.github.TB516.T3Code");
++      vi.stubEnv("XDG_RUNTIME_DIR", "/run/user/1000");
++      showOpenDialogMock.mockResolvedValue({
++        canceled: false,
++        filePaths: ["/run/user/1000/doc/document-id/project"],
++      });
++      execFileMock.mockImplementation((...args: unknown[]) => {
++        const callback = args.at(-1) as (error: null, stdout: string, stderr: string) => void;
++        callback(null, "id: document-id\n", "");
++      });
++      const dialog = yield* ElectronDialog.ElectronDialog;
++
++      const error = yield* Effect.flip(
++        dialog.pickFolder({ owner: Option.none(), defaultPath: Option.none() }),
++      );
++
++      assert.instanceOf(error, ElectronDialog.ElectronDialogPickFolderError);
++      assert.instanceOf(error.cause, Error);
++      assert.include((error.cause as Error).message, "could not resolve");
++    }).pipe(Effect.provide(ElectronDialog.layer)),
++  );
++
+   it.effect("preserves folder picker request context and cause", () =>
+     Effect.gen(function* () {
+       const cause = new Error("folder picker failed");
+diff --git a/apps/desktop/src/electron/ElectronDialog.ts b/apps/desktop/src/electron/ElectronDialog.ts
+index 182803337..baa503e20 100644
+--- a/apps/desktop/src/electron/ElectronDialog.ts
++++ b/apps/desktop/src/electron/ElectronDialog.ts
+@@ -1,3 +1,7 @@
++// @effect-diagnostics nodeBuiltinImport:off globalErrorInEffectCatch:off globalErrorInEffectFailure:off -- This native bridge wraps its errors at the public boundary.
++import { execFile } from "node:child_process";
++import * as NodePath from "node:path";
++
+ import * as Context from "effect/Context";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+@@ -6,6 +9,58 @@ import * as Schema from "effect/Schema";
+ 
+ import * as Electron from "electron";
+ 
++import { flatpakAppId } from "../app/Flatpak.ts";
++
++/** The folder picker can return a document portal path, but the server runs on the host. */
++const resolveHostFolderPath = Effect.fn("desktop.electron.dialog.resolveHostFolderPath")(function* (
++  folderPath: string,
++) {
++  const runtimeDir = process.env.XDG_RUNTIME_DIR;
++  if (
++    flatpakAppId(process.env, process.platform) === null ||
++    !runtimeDir ||
++    !folderPath.startsWith(`${runtimeDir}/doc/`)
++  ) {
++    return folderPath;
++  }
++
++  const stdout = yield* Effect.tryPromise({
++    try: () =>
++      new Promise<string>((resolve, reject) => {
++        execFile(
++          "/usr/bin/flatpak-spawn",
++          [
++            "--host",
++            "--directory=/",
++            "--env=LC_ALL=C",
++            "/usr/bin/flatpak",
++            "document-info",
++            folderPath,
++          ],
++          (error, stdout) => {
++            if (error) {
++              reject(error);
++              return;
++            }
++            resolve(stdout);
++          },
++        );
++      }),
++    catch: (cause) => new Error("Flatpak could not query the selected folder.", { cause }),
++  });
++  const origin = stdout
++    .split("\n")
++    .find((line) => line.startsWith("origin: "))
++    ?.slice("origin: ".length)
++    .replace(/\r$/, "");
++  if (!origin || !NodePath.isAbsolute(origin)) {
++    return yield* Effect.fail(
++      new Error("Flatpak could not resolve the selected folder to a host path."),
++    );
++  }
++  return origin;
++});
++
+ export class ElectronDialogPickFolderError extends Schema.TaggedError<ElectronDialogPickFolderError>()(
+   "ElectronDialogPickFolderError",
+   {
+@@ -136,7 +191,21 @@ export const make = ElectronDialog.of({
+     if (result.canceled) {
+       return Option.none();
+     }
+-    return Option.fromNullishOr(result.filePaths[0]);
++    const folderPath = result.filePaths[0];
++    if (!folderPath) {
++      return Option.none();
++    }
++    const hostPath = yield* resolveHostFolderPath(folderPath).pipe(
++      Effect.mapError(
++        (cause) =>
++          new ElectronDialogPickFolderError({
++            ownerWindowId,
++            defaultPath,
++            cause,
++          }),
++      ),
++    );
++    return Option.some(hostPath);
+   }),
+   pickFiles: Effect.fn("desktop.electron.dialog.pickFiles")(function* (input) {
+     const ownerWindowId = Option.match(input.owner, {

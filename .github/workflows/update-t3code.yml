@@ -1,0 +1,60 @@
+name: Check for T3 Code releases
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-t3code
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Update the stable release
+        uses: docker://ghcr.io/flathub/flatpak-external-data-checker:latest
+        with:
+          args: --edit-only --filter-type git flatpak/io.github.TB516.T3Code.yml
+
+      - name: Read updated release tag
+        id: release
+        uses: mikefarah/yq@v4
+        with:
+          cmd: yq -er '.sources[] | select(.type == "git") | .tag' flatpak/modules/t3code.yml
+
+      - name: Check for an open pull request for this release
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BRANCH: automation/update-t3code-${{ steps.release.outputs.result }}
+        run: |
+          open_prs=$(gh pr list --head "$PR_BRANCH" --state open --json number --jq length)
+          if [[ "$open_prs" != 0 ]]; then
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open update pull request
+        if: steps.existing.outputs.open != 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          add-paths: |
+            flatpak/modules/t3code.yml
+            flatpak/io.github.TB516.T3Code.metainfo.xml
+          branch: automation/update-t3code-${{ steps.release.outputs.result }}
+          delete-branch: true
+          draft: true
+          commit-message: "chore(flatpak): update T3 Code to ${{ steps.release.outputs.result }}"
+          title: Update T3 Code to ${{ steps.release.outputs.result }}
+          body: |
+            Update the pinned T3 Code release to [${{ steps.release.outputs.result }}](https://github.com/pingdotgg/t3code/releases/tag/${{ steps.release.outputs.result }}).
+
+            Review and refresh the patches in `patches/`, and ensure **Validate Flatpak update** passes before merging.

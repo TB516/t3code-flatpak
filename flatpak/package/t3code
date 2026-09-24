@@ -1,0 +1,54 @@
+#!/bin/sh
+set -eu
+umask 077
+unset ELECTRON_RUN_AS_NODE
+export ZYPAK_DISABLE_SANDBOX=1
+
+: "${FLATPAK_ID:?This launcher must run inside Flatpak}"
+: "${XDG_DATA_HOME:?Flatpak must supply its app data directory}"
+: "${XDG_CACHE_HOME:?Flatpak must supply its app cache directory}"
+
+export T3CODE_HOME="$XDG_DATA_HOME/t3"
+runtime_root="$XDG_CACHE_HOME/t3-runtimes"
+
+# The host service activation environment has a deliberately small PATH. Read
+# the user's login environment before Electron opens any protocol descriptors,
+# then pass only PATH back to the host server through flatpak-spawn.
+host_path=$(
+    /usr/bin/flatpak-spawn --host "${SHELL:-/bin/sh}" -ilc 'printf %s "$PATH"' \
+        3>&- 4>&- 5>&- 2>/dev/null || true
+)
+if [ -n "$host_path" ]; then
+    export T3CODE_FLATPAK_HOST_PATH="$host_path"
+fi
+
+# Serialize preparation and cleanup across launches, including different builds.
+mkdir -p "$runtime_root"
+exec 9>"$runtime_root/.lock"
+flock 9
+
+# Always copy from the read-only package, so cached modifications are never reused.
+# Reflinks share disk blocks where supported; other filesystems use a normal copy.
+T3CODE_FLATPAK_RUNTIME=$(mktemp -d "$runtime_root/runtime-XXXXXX")
+trap 'rm -rf -- "$T3CODE_FLATPAK_RUNTIME"' EXIT
+trap 'exit 1' HUP INT TERM
+cp -a --reflink=auto /app/t3code/. "$T3CODE_FLATPAK_RUNTIME/"
+test -x "$T3CODE_FLATPAK_RUNTIME/t3code"
+
+# This launch is already listed by Flatpak. Only prune when it is the sole
+# instance, so other desktops and their host servers can keep using their files.
+# If the host cannot report running instances, leave the cache alone.
+if running_apps=$(/usr/bin/flatpak-spawn --host flatpak ps --columns=application); then
+    if [ "$(printf '%s\n' "$running_apps" | grep -Fxc -- "$FLATPAK_ID")" -eq 1 ]; then
+        for cached_runtime in "$runtime_root"/*; do
+            if [ -d "$cached_runtime" ] && [ "$cached_runtime" != "$T3CODE_FLATPAK_RUNTIME" ]; then
+                rm -rf -- "$cached_runtime"
+            fi
+        done
+    fi
+fi
+exec 9>&-
+export T3CODE_FLATPAK_RUNTIME
+trap - EXIT HUP INT TERM
+
+exec zypak-wrapper /app/t3code/t3code "$@"

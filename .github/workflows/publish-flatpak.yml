@@ -1,0 +1,117 @@
+name: Publish Flatpak repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      first-publish:
+        description: Start a new repository without published history (first publication only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+env:
+  APP_ID: io.github.TB516.T3Code
+  FLATPAK_BRANCH: stable
+  FLATPAK_REPOSITORY_URL: https://t3code.thomasberrios.com/repo
+  PAGES_DIR: build-flatpak/pages
+
+jobs:
+  publish:
+    name: Build and publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Import repository signing key
+        id: signing
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+
+      - name: Prepare Flatpak repository
+        env:
+          GPG_FINGERPRINT: ${{ steps.signing.outputs.fingerprint }}
+        run: |
+          mkdir -p "$PAGES_DIR/repo"
+          gpg --batch --export "$GPG_FINGERPRINT" > build-flatpak-repository-key.gpg
+          ostree --repo="$PAGES_DIR/repo" init --mode=archive-z2
+
+      - name: Restore published repository history
+        if: ${{ !inputs.first-publish }}
+        run: |
+          repo="$PAGES_DIR/repo"
+          ostree --repo="$repo" remote add \
+            --gpg-import=build-flatpak-repository-key.gpg \
+            published \
+            "$FLATPAK_REPOSITORY_URL"
+          ostree --repo="$repo" pull \
+            --disable-static-deltas \
+            --mirror \
+            --depth=2 \
+            published
+          ostree --repo="$repo" remote delete published
+
+      - name: Build signed Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flatpak/io.github.TB516.T3Code.yml
+          branch: ${{ env.FLATPAK_BRANCH }}
+          build-bundle: false
+          upload-artifact: false
+          build-dir: build-flatpak/publish-build
+          repo-dir: ${{ env.PAGES_DIR }}/repo
+          state-dir: build-flatpak/builder-state
+          gpg-sign: ${{ steps.signing.outputs.fingerprint }}
+          cache-key: flatpak-builder-x86_64-${{ hashFiles('flatpak/**', '!flatpak/pages/**', 'patches/**') }}
+
+      - name: Sign repository summary and prune old builds
+        env:
+          GPG_FINGERPRINT: ${{ steps.signing.outputs.fingerprint }}
+        run: |
+          repo="$PAGES_DIR/repo"
+          ostree --repo="$repo" refs --delete \
+            "runtime/$APP_ID.Debug/x86_64/$FLATPAK_BRANCH"
+          flatpak build-update-repo \
+            --gpg-sign="$GPG_FINGERPRINT" \
+            --prune \
+            --prune-depth=2 \
+            "$repo"
+
+      - name: Stage website and install links
+        run: |
+          cp -a flatpak/pages/. "$PAGES_DIR/"
+          cp "build-flatpak/publish-build/files/share/icons/hicolor/128x128/apps/$APP_ID.png" "$PAGES_DIR/icon.png"
+          encoded_key=$(base64 --wrap=0 < build-flatpak-repository-key.gpg)
+          sed -i "s|@GPG_KEY@|$encoded_key|g" "$PAGES_DIR/"*.flatpakrepo "$PAGES_DIR/"*.flatpakref
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ env.PAGES_DIR }}
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

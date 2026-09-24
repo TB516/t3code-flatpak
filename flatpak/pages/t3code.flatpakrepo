@@ -1,0 +1,8 @@
+[Flatpak Repo]
+Title=T3 Code
+Url=https://t3code.thomasberrios.com/repo/
+Homepage=https://github.com/TB516/t3code-flatpak
+Comment=Unofficial Flatpak repository for T3 Code
+Description=T3 Code packaged for Linux with host development environment integration
+Icon=https://t3code.thomasberrios.com/icon.png
+GPGKey=@GPG_KEY@

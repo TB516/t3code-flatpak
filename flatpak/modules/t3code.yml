@@ -1,0 +1,72 @@
+name: t3code
+buildsystem: simple
+run-tests: true
+build-options:
+  append-path: /app/bin:/usr/lib/sdk/node24/bin:/usr/lib/sdk/rust-stable/bin
+  build-args:
+    - --share=network
+  env:
+    npm_config_nodedir: /usr/lib/sdk/node24
+build-commands:
+  - pnpm install --frozen-lockfile
+  - >-
+    T3CODE_DESKTOP_PLATFORM=linux
+    T3CODE_DESKTOP_TARGET=dir
+    T3CODE_DESKTOP_OUTPUT_DIR=flatpak-output
+    pnpm dist:desktop:artifact
+  - install -d /app/t3code /app/bin
+  - cp -a flatpak-output/linux*unpacked/. /app/t3code/
+  - install -m755 flatpak-package/host-server.sh flatpak-package/ssh-askpass /app/t3code/
+  - install -Dm755 flatpak-package/t3code /app/bin/t3code
+  - install -Dm755 flatpak-package/ssh /app/bin/ssh
+  - install -Dm644 flatpak-package/io.github.TB516.T3Code.desktop /app/share/applications/io.github.TB516.T3Code.desktop
+  - install -Dm644 flatpak-package/io.github.TB516.T3Code.metainfo.xml /app/share/metainfo/io.github.TB516.T3Code.metainfo.xml
+  - |
+    for size in 64 128 256 512; do
+      icon_dir="/app/share/icons/hicolor/${size}x${size}/apps"
+      install -d "$icon_dir"
+      magick assets/prod/black-universal-1024.png -resize "${size}x${size}" "$icon_dir/io.github.TB516.T3Code.png"
+    done
+test-rule: ""
+test-commands:
+  # Electron's npm package can use the binary built for this Flatpak.
+  - ln -s t3code flatpak-output/linux-unpacked/electron
+  # Flatpak identity changes desktop behavior; the upstream suite tests an ordinary host app.
+  # The WSL process-liveness tests need host /proc, which is unavailable in this sandbox.
+  - >-
+    ELECTRON_OVERRIDE_DIST_PATH=$PWD/flatpak-output/linux-unpacked
+    env -u FLATPAK_ID
+    pnpm --filter @t3tools/desktop exec vp test run
+    --exclude src/wsl/DesktopWslEnvironment.test.ts
+  - pnpm --filter @t3tools/desktop typecheck
+sources:
+  - type: git
+    url: https://github.com/pingdotgg/t3code.git
+    tag: v0.0.42
+    commit: 719a76ca1dbf5490f1aa33ffb9966301e02be9a9
+    x-checker-data:
+      type: json
+      url: https://api.github.com/repos/pingdotgg/t3code/releases/latest
+      tag-query: .tag_name
+      version-query: '$tag | ltrimstr("v")'
+      timestamp-query: .published_at
+      is-main-source: true
+      release-url-template: https://github.com/pingdotgg/t3code/releases/tag/v$version
+  - type: patch
+    paths:
+      - ../../patches/0001-flatpak-desktop-integration.patch
+      - ../../patches/0002-flatpak-host-backend.patch
+      - ../../patches/0003-flatpak-host-environment.patch
+      - ../../patches/0004-pnpm-install-configuration.patch
+      - ../../patches/0005-flatpak-build-artifact.patch
+      - ../../patches/0006-flatpak-document-portal-paths.patch
+    use-git: true
+  - type: dir
+    path: ../package
+    dest: flatpak-package
+  - type: file
+    path: ../io.github.TB516.T3Code.desktop
+    dest: flatpak-package
+  - type: file
+    path: ../io.github.TB516.T3Code.metainfo.xml
+    dest: flatpak-package

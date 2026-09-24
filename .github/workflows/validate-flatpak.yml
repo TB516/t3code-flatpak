@@ -1,0 +1,42 @@
+name: Validate Flatpak update
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/validate-flatpak.yml
+      - .github/workflows/publish-flatpak.yml
+      - flatpak/**
+      - '!flatpak/pages/**'
+      - patches/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test Flatpak
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build and test Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flatpak/io.github.TB516.T3Code.yml
+          branch: stable
+          build-bundle: false
+          upload-artifact: false
+          build-dir: build-flatpak/validation-build
+          repo-dir: build-flatpak/validation-repo
+          state-dir: build-flatpak/builder-state
+          cache-key: flatpak-builder-x86_64-${{ hashFiles('flatpak/**', '!flatpak/pages/**', 'patches/**') }}

@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+: "${FLATPAK_ID:?This SSH launcher must run inside Flatpak}"
+
+spawn=/usr/bin/flatpak-spawn
+
+# Public-key and agent authentication need no sandbox state. The host process
+# receives its normal HOME, SSH_AUTH_SOCK, and OpenSSH configuration.
+if [ "${SSH_ASKPASS_REQUIRE:-}" != force ]; then
+    exec "$spawn" --host --watch-bus ssh "$@"
+fi
+
+# The host cannot see upstream's helper in the sandbox's /tmp. Use the packaged
+# helper from this launch's fresh runtime copy instead.
+: "${T3CODE_FLATPAK_RUNTIME:?Missing host runtime directory}"
+
+set -- ssh "$@"
+if [ "${T3_SSH_AUTH_SECRET+x}" = x ]; then
+    set -- "--env=T3_SSH_AUTH_SECRET=$T3_SSH_AUTH_SECRET" "$@"
+fi
+
+exec "$spawn" \
+    --host \
+    --watch-bus \
+    "--env=SSH_ASKPASS=$T3CODE_FLATPAK_RUNTIME/ssh-askpass" \
+    --env=SSH_ASKPASS_REQUIRE=force \
+    "--env=DISPLAY=${DISPLAY:-t3code}" \
+    "$@"

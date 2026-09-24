@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=T3 Code (Flatpak)
+Comment=Work with coding agents on your machine
+Exec=t3code %U
+Icon=io.github.TB516.T3Code
+Terminal=false
+Categories=Development;IDE;
+StartupWMClass=io.github.TB516.T3Code
+MimeType=x-scheme-handler/t3code;

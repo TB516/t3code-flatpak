@@ -1,0 +1,13 @@
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index a4a6c3f6b..208c61161 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -15,7 +15,7 @@ allowBuilds:
+   electron: true
+   electron-winstaller: false
+   esbuild: true
+-  msgpackr-extract: true
++  msgpackr-extract: false
+   msw: false
+   node-pty: true
+   sharp: true

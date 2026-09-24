@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>T3 Code Flatpak</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color-scheme: dark;
+        background: #111;
+        color: #eee;
+      }
+
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+      }
+
+      main {
+        width: min(36rem, calc(100% - 3rem));
+      }
+
+      header {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+
+      img {
+        width: 4rem;
+        height: 4rem;
+      }
+
+      h1 {
+        margin: 0;
+      }
+
+      p {
+        line-height: 1.6;
+      }
+
+      a {
+        color: #8ab4f8;
+      }
+
+      .install {
+        display: inline-block;
+        margin: 0.75rem 0;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        background: #eee;
+        color: #111;
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      code {
+        display: block;
+        overflow-wrap: anywhere;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        background: #222;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icon.png" alt="" />
+        <div>
+          <h1>T3 Code Flatpak</h1>
+          <div>Unofficial package for x86_64 Linux</div>
+        </div>
+      </header>
+      <p>
+        T3 Code runs inside Flatpak while agents, terminals, Git, and project tools run in your
+        normal host development environment.
+      </p>
+      <a class="install" href="io.github.TB516.T3Code.flatpakref">Install T3 Code</a>
+      <p>
+        Accept the prompt to add the T3 Code repository for updates and to keep
+        the app available to reinstall after uninstalling.
+      </p>
+      <p>Or install T3 Code system-wide from a terminal:</p>
+      <code>flatpak install --system https://t3code.thomasberrios.com/io.github.TB516.T3Code.flatpakref</code>
+      <p>
+        You can also <a href="t3code.flatpakrepo">add the repository</a>
+        separately and install T3 Code later from your software store.
+      </p>
+      <p>
+        Source and release notes are available on
+        <a href="https://github.com/TB516/t3code-flatpak">GitHub</a>.
+      </p>
+    </main>
+  </body>
+</html>

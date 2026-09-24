@@ -1,0 +1,11 @@
+[Flatpak Ref]
+Title=T3 Code
+Name=io.github.TB516.T3Code
+Branch=stable
+Url=https://t3code.thomasberrios.com/repo/
+SuggestRemoteName=t3code
+Homepage=https://github.com/TB516/t3code-flatpak
+Icon=https://t3code.thomasberrios.com/icon.png
+RuntimeRepo=https://flathub.org/repo/flathub.flatpakrepo
+IsRuntime=false
+GPGKey=@GPG_KEY@
