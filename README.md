@@ -20,12 +20,11 @@ store or `flatpak update --system`.
 
 ## Host integration
 
-The Electron desktop runs inside Flatpak. Each launch makes a fresh copy of the
-bundled runtime in the app's cache and starts its server on the host with
-`flatpak-spawn`. Agents, terminals, Git, and project processes therefore use
-the normal host environment. Copy-on-write avoids duplicating file contents on
-supported filesystems. Old copies are removed on launch when no other instance
-is running.
+The Electron desktop runs inside Flatpak and starts its matching server on the
+host directly from the installed package, without copying the bundled runtime.
+Agents, terminals, Git, and project processes use the normal host environment.
+T3 Code's settings, history, and cache stay in
+`~/.var/app/io.github.TB516.T3Code/`.
 
 Remote environments use the host's OpenSSH client, configuration, and agent.
 The Flatpak can read `~/.ssh/config`, `~/.ssh/config.d`, and
