@@ -41,7 +41,7 @@ new file mode 100644
 index 000000000..54790debe
 --- /dev/null
 +++ b/apps/desktop/src/backend/flatpakBackend.test.ts
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,77 @@
 +import { assert, describe, it } from "@effect/vitest";
 +import * as Option from "effect/Option";
 +
@@ -76,7 +76,7 @@ index 000000000..54790debe
 +
 +describe("Flatpak backend", () => {
 +  it("keeps bootstrap and telemetry on forwarded FDs without exporting the sandbox environment", () => {
-+    const runtime = "/home/al ice/.var/app/t3/data/runtimes/build-$literal";
++    const runtime = "/home/al ice/.local/share/flatpak/app/t3/x86_64/stable/build-$literal/files/t3code";
 +    const result = flatpakBackendConfig(
 +      config,
 +      runtime,
@@ -97,6 +97,8 @@ index 000000000..54790debe
 +      "/bin/sh",
 +      `${runtime}/host-server.sh`,
 +    ]);
++    assert.equal(result.cwd, "/app/t3code");
++    assert.equal(result.entryPath, config.entryPath);
 +    assert.deepEqual(result.env, {});
 +    assert.equal(result.bootstrapDelivery, "fd3");
 +    assert.equal(result.bootstrap.desktopBootstrapToken, "test-token");
@@ -109,7 +111,7 @@ index 000000000..54790debe
 +    assert.equal(result.httpBaseUrl, config.httpBaseUrl);
 +  });
 +
-+  it("fails preflight instead of falling back to a sandbox backend when staging is missing", () => {
++  it("fails preflight instead of falling back to a sandbox backend when the deployment path is missing", () => {
 +    for (const runtime of [undefined, "", "relative/runtime"]) {
 +      const failure = Option.getOrThrow(flatpakBackendConfig(config, runtime).preflightFailure);
 +      assert.isTrue(failure.fatal);
@@ -127,7 +129,7 @@ index 000000000..923013ebe
 +
 +import type { DesktopBackendStartConfig } from "./DesktopBackendManager.ts";
 +
-+/** Launch the package's staged server through the host session, preserving desktop bootstrap FDs. */
++/** Launch the package's installed server through the host session, preserving desktop bootstrap FDs. */
 +export function flatpakBackendConfig(
 +  config: DesktopBackendStartConfig,
 +  runtimeDir: string | undefined,
@@ -143,7 +145,7 @@ index 000000000..923013ebe
 +    };
 +  }
 +
-+  // /app and Electron's resource paths do not exist in the host namespace.
++  // Keep entryPath in the sandbox for preflight checks; pass host paths to the server.
 +  const bootstrap = {
 +    ...config.bootstrap,
 +    resourceMonitorPath: `${runtimeDir}/resources/resource-monitor/t3-resource-monitor`,
@@ -165,8 +167,8 @@ index 000000000..923013ebe
 +      "/bin/sh",
 +      `${runtimeDir}/host-server.sh`,
 +    ],
-+    entryPath: `${runtimeDir}/resources/app.asar/apps/server/dist/bin.mjs`,
-+    cwd: runtimeDir,
++    // flatpak-spawn starts inside the sandbox; only its child uses the host path.
++    cwd: "/app/t3code",
 +    // This environment belongs to flatpak-spawn. Only its explicit --env
 +    // arguments cross to the host; the rest comes from the host session.
 +    env: {},

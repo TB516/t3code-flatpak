@@ -13,6 +13,13 @@
   <launchable type="desktop-id">io.github.TB516.T3Code.desktop</launchable>
   <url type="homepage">https://t3.codes</url>
   <releases>
+    <release version="0.0.42.1" date="2026-09-25">
+      <description>
+        <p>Run the host server directly from the installed Flatpak package,
+        avoiding a runtime copy on each launch. T3 Code data stays in the
+        app's Flatpak directory.</p>
+      </description>
+    </release>
     <release version="0.0.42" date="2026-09-19" />
   </releases>
   <content_rating type="oars-1.1" />
