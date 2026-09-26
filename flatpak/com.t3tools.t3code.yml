@@ -1,4 +1,4 @@
-id: io.github.TB516.T3Code
+id: com.t3tools.t3code
 runtime: org.freedesktop.Platform
 runtime-version: "25.08"
 sdk: org.freedesktop.Sdk

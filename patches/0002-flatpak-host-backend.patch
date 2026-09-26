@@ -60,7 +60,7 @@ index 000000000..54790debe
 +    noBrowser: true,
 +    port: 12345,
 +    host: "127.0.0.1",
-+    t3Home: "/home/alice/.var/app/com.t3tools.T3Code.Flatpak/data/t3",
++    t3Home: "/home/alice/.var/app/com.t3tools.t3code/data/t3",
 +    desktopBootstrapToken: "test-token",
 +    tailscaleServeEnabled: false,
 +    tailscaleServePort: 443,

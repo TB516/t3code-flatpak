@@ -4,7 +4,7 @@ The package builds a pinned upstream release with the numbered patches in
 `patches/`. Dependencies come from the upstream lockfile during the build.
 
 The host needs Flatpak, Flatpak Builder, and the runtimes, base app, and SDK
-extensions declared in `flatpak/io.github.TB516.T3Code.yml`. The builder uses
+extensions declared in `flatpak/com.t3tools.t3code.yml`. The builder uses
 the per-user installation for build dependencies. The script does not install
 or update them.
 
@@ -13,7 +13,7 @@ or update them.
 ```
 
 This builds the package, runs desktop tests and typecheck, and writes
-`build-flatpak/io.github.TB516.T3Code.flatpak`.
+`build-flatpak/com.t3tools.t3code.flatpak`.
 
 To build and install the package for your user, then launch it:
 

@@ -5,7 +5,7 @@
 The **Check for T3 Code releases** workflow checks daily and opens a draft PR
 when upstream publishes a new stable release. The external data checker updates
 the release tag and matching commit in `flatpak/modules/t3code.yml` and adds the
-release to `flatpak/io.github.TB516.T3Code.metainfo.xml`. Refresh the numbered
+release to `flatpak/com.t3tools.t3code.metainfo.xml`. Refresh the numbered
 patches in `patches/` before merging.
 
 Each release gets its own branch, such as `automation/update-t3code-v0.0.43`.
@@ -68,6 +68,8 @@ gh secret set FLATPAK_GPG_PRIVATE_KEY < t3code-flatpak-signing-key.asc
 
 Delete the exported file from disk after both copies are stored.
 
-For the first publication of a new repository, select **first-publish** when
-starting the workflow. Leave it off for subsequent releases to preserve the
-published history. The existing T3 Code repository is already initialized.
+For the first publication with `com.t3tools.t3code`, select **first-publish**
+when starting the workflow. This replaces the published repository and removes
+the old `io.github.TB516.T3Code` ref from GitHub Pages. Existing installations
+of that ID will no longer receive updates. Leave **first-publish** off for
+subsequent releases to preserve the new repository's history.

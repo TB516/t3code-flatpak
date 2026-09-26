@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly PROJECT_ROOT
-readonly APP_ID="io.github.TB516.T3Code"
+readonly APP_ID="com.t3tools.t3code"
 readonly MANIFEST="$PROJECT_ROOT/flatpak/$APP_ID.yml"
 readonly BRANCH=stable
 readonly OUTPUT="$PROJECT_ROOT/build-flatpak"
