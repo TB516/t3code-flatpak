@@ -39,6 +39,8 @@ test-commands:
     pnpm --filter @t3tools/desktop exec vp test run
     --exclude src/wsl/DesktopWslEnvironment.test.ts
   - pnpm --filter @t3tools/desktop typecheck
+  - pnpm --filter t3 exec vp test run src/process/externalLauncher.test.ts
+  - pnpm --filter t3 typecheck
 sources:
   - type: git
     url: https://github.com/pingdotgg/t3code.git
@@ -60,6 +62,7 @@ sources:
       - ../../patches/0004-pnpm-install-configuration.patch
       - ../../patches/0005-flatpak-build-artifact.patch
       - ../../patches/0006-flatpak-document-portal-paths.patch
+      - ../../patches/0007-flatpak-editor-discovery.patch
     use-git: true
   - type: dir
     path: ../package
