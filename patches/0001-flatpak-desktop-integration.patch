@@ -46,11 +46,11 @@ index 0e5fbecd0..6ac9dbabd 100644
 +    Effect.gen(function* () {
 +      const environment = yield* makeEnvironment(
 +        { platform: "linux" },
-+        { FLATPAK_ID: "com.t3tools.T3Code.Flatpak" },
++        { FLATPAK_ID: "com.t3tools.t3code" },
 +      );
 +
 +      assert.equal(environment.displayName, "T3 Code (Flatpak)");
-+      assert.equal(environment.linuxDesktopEntryName, "com.t3tools.T3Code.Flatpak.desktop");
++      assert.equal(environment.linuxDesktopEntryName, "com.t3tools.t3code.desktop");
 +    }),
 +  );
 +
@@ -105,7 +105,7 @@ index f0b881015..a932e915f 100644
  
  describe("DesktopLinuxUrlHandler", () => {
 +  it.effect("leaves Flatpak desktop registration to the package", () => {
-+    vi.stubEnv("FLATPAK_ID", "com.t3tools.T3Code.Flatpak");
++    vi.stubEnv("FLATPAK_ID", "com.t3tools.t3code");
 +    const recorded = emptyRecording();
 +    return runRegister(recorded).pipe(
 +      Effect.tap(() => Effect.sync(() => assert.deepEqual(recorded, emptyRecording()))),
@@ -149,13 +149,13 @@ index 9ddaf40ca..2be2a6067 100644
  
  describe("DesktopPreReadyPlatform", () => {
 +  it.effect("uses the packaged Flatpak identity without writing a desktop entry", () => {
-+    vi.stubEnv("FLATPAK_ID", "com.t3tools.T3Code.Flatpak");
++    vi.stubEnv("FLATPAK_ID", "com.t3tools.t3code");
 +    return Effect.gen(function* () {
 +      yield* DesktopPreReadyPlatform.DesktopPreReadyElectronOptions;
-+      assert.deepEqual(setDesktopNameMock.mock.calls, [["com.t3tools.T3Code.Flatpak.desktop"]]);
++      assert.deepEqual(setDesktopNameMock.mock.calls, [["com.t3tools.t3code.desktop"]]);
 +      assert.isTrue(
 +        appendSwitchMock.mock.calls.some(
-+          ([name, value]) => name === "class" && value === "com.t3tools.T3Code.Flatpak",
++          ([name, value]) => name === "class" && value === "com.t3tools.t3code",
 +        ),
 +      );
 +      assert.equal(mkdirSyncMock.mock.calls.length, 0);

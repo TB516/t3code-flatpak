@@ -1,6 +1,6 @@
 [Flatpak Ref]
 Title=T3 Code
-Name=io.github.TB516.T3Code
+Name=com.t3tools.t3code
 Branch=stable
 Url=https://t3code.thomasberrios.com/repo/
 SuggestRemoteName=t3code

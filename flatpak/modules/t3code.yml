@@ -19,13 +19,13 @@ build-commands:
   - install -m755 flatpak-package/host-server.sh flatpak-package/ssh-askpass /app/t3code/
   - install -Dm755 flatpak-package/t3code /app/bin/t3code
   - install -Dm755 flatpak-package/ssh /app/bin/ssh
-  - install -Dm644 flatpak-package/io.github.TB516.T3Code.desktop /app/share/applications/io.github.TB516.T3Code.desktop
-  - install -Dm644 flatpak-package/io.github.TB516.T3Code.metainfo.xml /app/share/metainfo/io.github.TB516.T3Code.metainfo.xml
+  - install -Dm644 flatpak-package/com.t3tools.t3code.desktop /app/share/applications/com.t3tools.t3code.desktop
+  - install -Dm644 flatpak-package/com.t3tools.t3code.metainfo.xml /app/share/metainfo/com.t3tools.t3code.metainfo.xml
   - |
     for size in 64 128 256 512; do
       icon_dir="/app/share/icons/hicolor/${size}x${size}/apps"
       install -d "$icon_dir"
-      magick assets/prod/black-universal-1024.png -resize "${size}x${size}" "$icon_dir/io.github.TB516.T3Code.png"
+      magick assets/prod/black-universal-1024.png -resize "${size}x${size}" "$icon_dir/com.t3tools.t3code.png"
     done
 test-rule: ""
 test-commands:
@@ -65,8 +65,8 @@ sources:
     path: ../package
     dest: flatpak-package
   - type: file
-    path: ../io.github.TB516.T3Code.desktop
+    path: ../com.t3tools.t3code.desktop
     dest: flatpak-package
   - type: file
-    path: ../io.github.TB516.T3Code.metainfo.xml
+    path: ../com.t3tools.t3code.metainfo.xml
     dest: flatpak-package

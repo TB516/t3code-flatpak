@@ -8,7 +8,7 @@ index 5a76402b1..ed1e339c7 100644
  describe("DesktopShellEnvironment", () => {
 +  it.effect("leaves the Flatpak environment intact without starting a login shell", () => {
 +    const env = {
-+      FLATPAK_ID: "com.t3tools.T3Code.Flatpak",
++      FLATPAK_ID: "com.t3tools.t3code",
 +      PATH: "/app/bin:/usr/bin",
 +      HOME: "/home/alice",
 +    };
@@ -59,7 +59,7 @@ index 509778521..7b23c3382 100644
  
  describe("DesktopUpdates", () => {
 +  it.effect("leaves updates to Flatpak even when an update feed is configured", () => {
-+    vi.stubEnv("FLATPAK_ID", "com.t3tools.T3Code.Flatpak");
++    vi.stubEnv("FLATPAK_ID", "com.t3tools.t3code");
 +    const harness = makeHarness({ platform: "linux" });
 +    return Effect.gen(function* () {
 +      const updates = yield* DesktopUpdates.DesktopUpdates;
