@@ -8,6 +8,10 @@ the release tag and matching commit in `flatpak/modules/t3code.yml` and adds the
 release to `flatpak/com.t3tools.t3code.metainfo.xml`. Refresh the numbered
 patches in `patches/` before merging.
 
+For packaging updates without a new upstream release, append a hyphen and
+package revision to the upstream version in AppStream, such as `0.0.42-2`.
+Increment that revision for each packaging release.
+
 Each release gets its own branch, such as `automation/update-t3code-v0.0.43`.
 The updater leaves an existing PR for that version alone, so newer releases
 can open separate PRs without overwriting patch fixes under review.
@@ -17,16 +21,17 @@ reopened. It can also be started from the Actions tab. GitHub requires approval
 for runs triggered by the updater's `GITHUB_TOKEN`; approve them in the PR.
 New commits cancel older validation runs for the same PR. Website-only changes
 skip package validation and do not change the build cache key.
-The workflow applies the patches, builds the Flatpak, and runs desktop tests
-and typecheck. The WSL test file is excluded because some of its tests inspect
-host processes that the Flatpak build sandbox cannot see.
+The workflow applies the patches, builds the Flatpak, runs desktop tests and
+the editor launcher test, and typechecks the desktop and server. The WSL test
+file is excluded because some of its tests inspect host processes that the
+Flatpak build sandbox cannot see.
 
 ## Publishing
 
 The **Publish Flatpak repository** workflow builds and signs the stable x86_64
 package, then deploys it to `https://t3code.thomasberrios.com` with GitHub
-Pages. It runs desktop tests and typecheck before publishing, and starts only
-when manually triggered from the Actions tab.
+Pages. It runs the package's tests and typechecks before publishing, and starts
+only when manually triggered from the Actions tab.
 
 Keep **Settings → Pages → Source** set to **GitHub Actions**. The workflow
 uploads the website and Flatpak repository together as a Pages artifact.

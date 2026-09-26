@@ -12,7 +12,8 @@ or update them.
 ./scripts/build-flatpak build
 ```
 
-This builds the package, runs desktop tests and typecheck, and writes
+This builds the package, runs desktop tests and the editor launcher test,
+typechecks the desktop and server, and writes
 `build-flatpak/com.t3tools.t3code.flatpak`.
 
 To build and install the package for your user, then launch it:

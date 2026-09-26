@@ -1,0 +1,176 @@
+diff --git a/apps/server/src/process/externalLauncher.test.ts b/apps/server/src/process/externalLauncher.test.ts
+index b7092d7..b1db69b 100644
+--- a/apps/server/src/process/externalLauncher.test.ts
++++ b/apps/server/src/process/externalLauncher.test.ts
+@@ -159,6 +159,55 @@ it.effect("launches an installed editor with platform-safe arguments", () =>
+   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+ );
+ 
++it.effect.skipIf(windowsHost)("discovers and launches Flatpak editors without host commands", () =>
++  Effect.gen(function* () {
++    const fileSystem = yield* FileSystem.FileSystem;
++    const path = yield* Path.Path;
++    const binDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-flatpak-editors-" });
++    const flatpakPath = path.join(binDir, "flatpak");
++    yield* fileSystem.writeFileString(flatpakPath, "#!/bin/sh\n");
++    yield* fileSystem.chmod(flatpakPath, 0o755);
++
++    const spawned: ChildProcess.StandardCommand[] = [];
++    const available = yield* Effect.gen(function* () {
++      const launcher = yield* ExternalLauncher.ExternalLauncher;
++      const editors = yield* launcher.resolveAvailableEditors();
++      yield* launcher.launchEditor({ editor: "zed", cwd: "/home/alice/project" });
++      yield* launcher.launchEditor({ editor: "vscode", cwd: "/home/alice/project/src/main.ts:12" });
++      yield* launcher.launchEditor({ editor: "idea", cwd: "/home/alice/project" });
++      return editors;
++    }).pipe(
++      Effect.provide(
++        testLayer({
++          platform: "linux",
++          env: { PATH: binDir },
++          onSpawn: (command) => spawned.push(command),
++          spawnResult: (command) =>
++            command.command === "flatpak" && command.args[0] === "list"
++              ? {
++                  stdout:
++                    "dev.zed.Zed\ncom.visualstudio.code\ncom.jetbrains.IntelliJ-IDEA-Community\n",
++                }
++              : undefined,
++        }),
++      ),
++    );
++
++    assert.ok(available.includes("zed"));
++    assert.ok(available.includes("vscode"));
++    assert.ok(available.includes("idea"));
++    assert.ok(!available.includes("vscodium"));
++    assert.deepEqual(
++      spawned.filter((command) => command.args[0] === "run").map((command) => command.args),
++      [
++        ["run", "dev.zed.Zed", "/home/alice/project"],
++        ["run", "com.visualstudio.code", "--goto", "/home/alice/project/src/main.ts:12"],
++        ["run", "com.jetbrains.IntelliJ-IDEA-Community", "/home/alice/project"],
++      ],
++    );
++  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
++);
++
+ for (const platform of ["darwin", "linux"] as const) {
+   it.effect.skipIf(windowsHost)(`launches Cursor in classic IDE mode on ${platform}`, () =>
+     Effect.gen(function* () {
+diff --git a/apps/server/src/process/externalLauncher.ts b/apps/server/src/process/externalLauncher.ts
+index 2b73100..7df9236 100644
+--- a/apps/server/src/process/externalLauncher.ts
++++ b/apps/server/src/process/externalLauncher.ts
+@@ -114,6 +114,67 @@ const CommandLookupEnvConfig = Config.all({
+ const readBrowserLaunchEnv = BrowserLaunchEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
+ const readCommandLookupEnv = CommandLookupEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
+ 
++// Flatpak does not export an editor's usual CLI command to the host PATH.
++// Keep these IDs next to discovery so the same installed app is launched.
++const FLATPAK_EDITOR_APP_IDS: Partial<Record<EditorId, readonly string[]>> = {
++  vscode: ["com.visualstudio.code"],
++  "vscode-insiders": ["com.visualstudio.code.insiders"],
++  vscodium: ["com.vscodium.codium"],
++  zed: ["dev.zed.Zed", "dev.zed.Zed-Preview"],
++  idea: ["com.jetbrains.IntelliJ-IDEA-Ultimate", "com.jetbrains.IntelliJ-IDEA-Community"],
++  clion: ["com.jetbrains.CLion"],
++  datagrip: ["com.jetbrains.DataGrip"],
++  goland: ["com.jetbrains.GoLand"],
++  phpstorm: ["com.jetbrains.PhpStorm"],
++  pycharm: ["com.jetbrains.PyCharm-Professional", "com.jetbrains.PyCharm-Community"],
++  rider: ["com.jetbrains.Rider"],
++  rubymine: ["com.jetbrains.RubyMine"],
++  rustrover: ["com.jetbrains.RustRover"],
++  webstorm: ["com.jetbrains.WebStorm"],
++};
++
++const installedFlatpakAppIds = Effect.fn("externalLauncher.installedFlatpakAppIds")(function* (
++  platform: NodeJS.Platform,
++  env: NodeJS.ProcessEnv,
++): Effect.fn.Return<
++  ReadonlySet<string>,
++  never,
++  FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
++> {
++  if (platform !== "linux" || !(yield* isCommandAvailable("flatpak", { env }))) {
++    return new Set<string>();
++  }
++
++  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
++  return yield* spawner
++    .spawn(
++      ChildProcess.make("flatpak", ["list", "--app", "--columns=application"], {
++        stdin: "ignore",
++        stderr: "ignore",
++      }),
++    )
++    .pipe(
++      Effect.flatMap((handle) =>
++        Effect.all([handle.stdout.pipe(Stream.decodeText(), Stream.mkString), handle.exitCode], {
++          concurrency: "unbounded",
++        }),
++      ),
++      Effect.map(([stdout, exitCode]) =>
++        exitCode === 0 ? new Set(stdout.split("\n").map((id) => id.trim())) : new Set<string>(),
++      ),
++      Effect.scoped,
++      Effect.timeout("2 seconds"),
++      Effect.orElseSucceed(() => new Set<string>()),
++    );
++});
++
++function installedFlatpakEditorAppId(
++  editor: EditorId,
++  installedApps: ReadonlySet<string>,
++): string | undefined {
++  return FLATPAK_EDITOR_APP_IDS[editor]?.find((appId) => installedApps.has(appId));
++}
++
+ function parseTargetPathAndPosition(target: string): Option.Option<TargetPathAndPosition> {
+   const match = TARGET_WITH_POSITION_PATTERN.exec(target);
+   if (!match?.[1] || !match[2]) {
+@@ -426,6 +487,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+   FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
+ > {
+   const available: EditorId[] = [];
++  const flatpakApps = yield* installedFlatpakAppIds(platform, env);
+ 
+   for (const editor of EDITORS) {
+     if (editor.commands === null) {
+@@ -436,7 +498,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+     }
+ 
+     const command = yield* resolveAvailableCommand(editor.commands, env);
+-    if (Option.isSome(command)) {
++    if (Option.isSome(command) || installedFlatpakEditorAppId(editor.id, flatpakApps)) {
+       available.push(editor.id);
+     }
+   }
+@@ -538,10 +600,22 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
+   }
+ 
+   if (editorDef.commands) {
+-    const command = Option.getOrElse(
+-      yield* resolveAvailableCommand(editorDef.commands, env),
+-      () => editorDef.commands[0],
+-    );
++    const installedCommand = yield* resolveAvailableCommand(editorDef.commands, env);
++    if (Option.isNone(installedCommand)) {
++      const appId = installedFlatpakEditorAppId(
++        editorDef.id,
++        yield* installedFlatpakAppIds(platform, env),
++      );
++      if (appId) {
++        return {
++          editor: editorDef.id,
++          target: input.cwd,
++          command: "flatpak",
++          args: ["run", appId, ...resolveEditorArgs(editorDef, input.cwd)],
++        };
++      }
++    }
++    const command = Option.getOrElse(installedCommand, () => editorDef.commands[0]);
+     return {
+       editor: editorDef.id,
+       target: input.cwd,
