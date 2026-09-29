@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-index 5a76402b1..ed1e339c7 100644
+index 6a369a45..6ebdaf06 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 @@ -100,6 +100,21 @@ function runShellEnvironment(input: {
@@ -25,7 +25,7 @@ index 5a76402b1..ed1e339c7 100644
      Effect.gen(function* () {
        const env: NodeJS.ProcessEnv = {
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.ts b/apps/desktop/src/shell/DesktopShellEnvironment.ts
-index 5c6b67fd5..e9f5ce1b9 100644
+index 704b061d..71b33253 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.ts
 @@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
@@ -36,7 +36,7 @@ index 5c6b67fd5..e9f5ce1b9 100644
  import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
  
  type EnvironmentPatch = Record<string, string>;
-@@ -524,6 +525,7 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
+@@ -500,6 +501,7 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
  const installShellEnvironment = (
    config: ShellEnvironmentConfig,
  ): Effect.Effect<void, never, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> => {
@@ -45,16 +45,16 @@ index 5c6b67fd5..e9f5ce1b9 100644
      return installWindowsEnvironment(config);
    }
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index 509778521..7b23c3382 100644
+index 9745662c..39c39503 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
 @@ -1,4 +1,4 @@
 -import { assert, describe, it } from "@effect/vitest";
 +import { assert, describe, it, vi } from "@effect/vitest";
+ import { DESKTOP_UPDATE_RESTART_MARKER_FILE } from "@t3tools/contracts";
  import * as Cause from "effect/Cause";
  import * as Deferred from "effect/Deferred";
- import * as Duration from "effect/Duration";
-@@ -19,6 +19,28 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
+@@ -21,6 +21,28 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
  import { flushCallbacks, makeHarness } from "./updatesTestHarness.ts";
  
  describe("DesktopUpdates", () => {
@@ -84,15 +84,15 @@ index 509778521..7b23c3382 100644
      const cause = Cause.combine(
        Cause.fail(new Error("updater failed")),
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index c35b52e83..edfc0a9ea 100644
+index 245925a6..3aac79ec 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
 @@ -1,3 +1,4 @@
 +import { flatpakAppId } from "../app/Flatpak.ts";
  import {
+   DESKTOP_UPDATE_RESTART_MARKER_FILE,
    DesktopUpdateChannelSchema,
-   type DesktopRuntimeInfo,
-@@ -252,6 +253,9 @@ function getAutoUpdateDisabledReason(args: {
+@@ -254,6 +255,9 @@ function getAutoUpdateDisabledReason(args: {
    disabledByEnv: boolean;
    hasUpdateFeedConfig: boolean;
  }): string | null {
@@ -102,24 +102,3 @@ index c35b52e83..edfc0a9ea 100644
    if (!args.hasUpdateFeedConfig) {
      return "Automatic updates are not available because no update feed is configured.";
    }
-diff --git a/apps/desktop/src/updates/updatesTestHarness.ts b/apps/desktop/src/updates/updatesTestHarness.ts
-index fbcbb349f..c9383ee84 100644
---- a/apps/desktop/src/updates/updatesTestHarness.ts
-+++ b/apps/desktop/src/updates/updatesTestHarness.ts
-@@ -20,6 +20,7 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
- export const flushCallbacks = Effect.yieldNow;
- 
- export interface UpdatesHarnessOptions {
-+  readonly platform?: NodeJS.Platform;
-   readonly checkForUpdates?: Effect.Effect<
-     void,
-     ElectronUpdater.ElectronUpdaterCheckForUpdatesError
-@@ -145,7 +146,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
-   const environmentLayer = DesktopEnvironment.layer({
-     dirname: "/repo/apps/desktop/src",
-     homeDirectory: `/tmp/t3-desktop-updates-home-${process.pid}`,
--    platform: "darwin",
-+    platform: options.platform ?? "darwin",
-     processArch: "x64",
-     appVersion: "1.2.3",
-     appPath: "/repo",

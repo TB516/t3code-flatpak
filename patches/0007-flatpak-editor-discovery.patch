@@ -1,5 +1,5 @@
 diff --git a/apps/server/src/process/externalLauncher.test.ts b/apps/server/src/process/externalLauncher.test.ts
-index b7092d7..b1db69b 100644
+index aab4d78f..0230bc5a 100644
 --- a/apps/server/src/process/externalLauncher.test.ts
 +++ b/apps/server/src/process/externalLauncher.test.ts
 @@ -159,6 +159,55 @@ it.effect("launches an installed editor with platform-safe arguments", () =>
@@ -59,10 +59,10 @@ index b7092d7..b1db69b 100644
    it.effect.skipIf(windowsHost)(`launches Cursor in classic IDE mode on ${platform}`, () =>
      Effect.gen(function* () {
 diff --git a/apps/server/src/process/externalLauncher.ts b/apps/server/src/process/externalLauncher.ts
-index 2b73100..7df9236 100644
+index ab287e4d..20be8a1c 100644
 --- a/apps/server/src/process/externalLauncher.ts
 +++ b/apps/server/src/process/externalLauncher.ts
-@@ -114,6 +114,67 @@ const CommandLookupEnvConfig = Config.all({
+@@ -125,6 +125,67 @@ const CommandLookupEnvConfig = Config.all({
  const readBrowserLaunchEnv = BrowserLaunchEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
  const readCommandLookupEnv = CommandLookupEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
  
@@ -130,7 +130,7 @@ index 2b73100..7df9236 100644
  function parseTargetPathAndPosition(target: string): Option.Option<TargetPathAndPosition> {
    const match = TARGET_WITH_POSITION_PATTERN.exec(target);
    if (!match?.[1] || !match[2]) {
-@@ -426,6 +487,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+@@ -417,6 +478,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
    FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
  > {
    const available: EditorId[] = [];
@@ -138,39 +138,38 @@ index 2b73100..7df9236 100644
  
    for (const editor of EDITORS) {
      if (editor.commands === null) {
-@@ -436,7 +498,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+@@ -427,7 +489,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
      }
  
-     const command = yield* resolveAvailableCommand(editor.commands, env);
+     const command = yield* resolveEditorCommand(editor, env);
 -    if (Option.isSome(command)) {
 +    if (Option.isSome(command) || installedFlatpakEditorAppId(editor.id, flatpakApps)) {
        available.push(editor.id);
      }
    }
-@@ -538,10 +600,22 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
+@@ -529,8 +591,24 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
    }
  
    if (editorDef.commands) {
--    const command = Option.getOrElse(
--      yield* resolveAvailableCommand(editorDef.commands, env),
--      () => editorDef.commands[0],
--    );
-+    const installedCommand = yield* resolveAvailableCommand(editorDef.commands, env);
++    const installedCommand = yield* resolveEditorCommand(editorDef, env);
 +    if (Option.isNone(installedCommand)) {
 +      const appId = installedFlatpakEditorAppId(
 +        editorDef.id,
 +        yield* installedFlatpakAppIds(platform, env),
 +      );
 +      if (appId) {
++        const baseArgs = "baseArgs" in editorDef ? editorDef.baseArgs : [];
 +        return {
 +          editor: editorDef.id,
 +          target: input.cwd,
 +          command: "flatpak",
-+          args: ["run", appId, ...resolveEditorArgs(editorDef, input.cwd)],
++          args: ["run", appId, ...baseArgs, ...resolveCommandEditorArgs(editorDef, input.cwd)],
 +        };
 +      }
 +    }
-+    const command = Option.getOrElse(installedCommand, () => editorDef.commands[0]);
-     return {
-       editor: editorDef.id,
-       target: input.cwd,
+     const { command, baseArgs } = Option.getOrElse(
+-      yield* resolveEditorCommand(editorDef, env),
++      installedCommand,
+       () => ({
+         command: editorDef.commands[0],
+         baseArgs: "baseArgs" in editorDef ? editorDef.baseArgs : [],
