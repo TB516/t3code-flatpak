@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
-index a36902304..77f8ab9a8 100644
+index c2012299..4edb253f 100644
 --- a/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 +++ b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 @@ -1,5 +1,8 @@
@@ -11,16 +11,16 @@ index a36902304..77f8ab9a8 100644
  import { parsePersistedServerObservabilitySettings } from "@t3tools/shared/serverSettings";
  import * as Context from "effect/Context";
  import * as Crypto from "effect/Crypto";
-@@ -522,7 +525,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
+@@ -567,7 +570,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
        ...buildObservabilityFragment(input.observabilitySettings),
      };
  
 -    return {
 +    const config = {
        executablePath: process.execPath,
-       args: [environment.backendEntryPath, "--bootstrap-fd", "3"],
-       entryPath: environment.backendEntryPath,
-@@ -539,6 +542,15 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
+       // Packaged builds only, so a dev instance never shares the cache with the
+       // prod app it is often run from. `--require` rather than NODE_COMPILE_CACHE,
+@@ -593,6 +596,15 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
        captureOutput: true,
        preflightFailure: Option.none(),
      } satisfies DesktopBackendManager.DesktopBackendStartConfig;
@@ -38,10 +38,10 @@ index a36902304..77f8ab9a8 100644
  
 diff --git a/apps/desktop/src/backend/flatpakBackend.test.ts b/apps/desktop/src/backend/flatpakBackend.test.ts
 new file mode 100644
-index 000000000..54790debe
+index 00000000..4839d211
 --- /dev/null
 +++ b/apps/desktop/src/backend/flatpakBackend.test.ts
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,78 @@
 +import { assert, describe, it } from "@effect/vitest";
 +import * as Option from "effect/Option";
 +
@@ -93,6 +93,7 @@ index 000000000..54790debe
 +      `--env=T3CODE_HOME=${config.bootstrap.t3Home}`,
 +      `--env=T3CODE_FLATPAK_SERVER=${runtime}/t3code`,
 +      `--env=T3CODE_FLATPAK_ENTRY=${runtime}/resources/app.asar/apps/server/dist/bin.mjs`,
++      `--env=T3CODE_FLATPAK_COMPILE_CACHE=${runtime}/resources/app.asar/apps/desktop/dist-electron/compileCache.cjs`,
 +      "--env=PATH=/home/alice/.local/bin:/usr/bin",
 +      "/bin/sh",
 +      `${runtime}/host-server.sh`,
@@ -121,10 +122,10 @@ index 000000000..54790debe
 +});
 diff --git a/apps/desktop/src/backend/flatpakBackend.ts b/apps/desktop/src/backend/flatpakBackend.ts
 new file mode 100644
-index 000000000..923013ebe
+index 00000000..76d37f9e
 --- /dev/null
 +++ b/apps/desktop/src/backend/flatpakBackend.ts
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,52 @@
 +import * as Option from "effect/Option";
 +
 +import type { DesktopBackendStartConfig } from "./DesktopBackendManager.ts";
@@ -163,6 +164,7 @@ index 000000000..923013ebe
 +      `--env=T3CODE_HOME=${bootstrap.t3Home}`,
 +      `--env=T3CODE_FLATPAK_SERVER=${runtimeDir}/t3code`,
 +      `--env=T3CODE_FLATPAK_ENTRY=${runtimeDir}/resources/app.asar/apps/server/dist/bin.mjs`,
++      `--env=T3CODE_FLATPAK_COMPILE_CACHE=${runtimeDir}/resources/app.asar/apps/desktop/dist-electron/compileCache.cjs`,
 +      ...(hostPath?.trim() ? [`--env=PATH=${hostPath}`] : []),
 +      "/bin/sh",
 +      `${runtimeDir}/host-server.sh`,
