@@ -27,7 +27,7 @@ build-commands:
       install -d "$icon_dir"
       magick assets/prod/black-universal-1024.png -resize "${size}x${size}" "$icon_dir/com.t3tools.t3code.png"
     done
-test-rule: ""
+test-rule: ''
 test-commands:
   # Electron's npm package can use the binary built for this Flatpak.
   - ln -s t3code flatpak-output/linux-unpacked/electron
@@ -44,13 +44,13 @@ test-commands:
 sources:
   - type: git
     url: https://github.com/pingdotgg/t3code.git
-    tag: v0.0.42
-    commit: 719a76ca1dbf5490f1aa33ffb9966301e02be9a9
+    tag: v0.0.43
+    commit: 27bdf1aa14e6b946b72fb7013062084ca70796a6
     x-checker-data:
       type: json
       url: https://api.github.com/repos/pingdotgg/t3code/releases/latest
       tag-query: .tag_name
-      version-query: '$tag | ltrimstr("v")'
+      version-query: $tag | ltrimstr("v")
       timestamp-query: .published_at
       is-main-source: true
       release-url-template: https://github.com/pingdotgg/t3code/releases/tag/v$version
