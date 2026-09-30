@@ -13,6 +13,12 @@
   <launchable type="desktop-id">com.t3tools.t3code.desktop</launchable>
   <url type="homepage">https://t3.codes</url>
   <releases>
+    <release version="0.0.44" date="2026-09-29">
+      <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.0.44</url>
+      <description>
+        <p>Update to T3 Code 0.0.44.</p>
+      </description>
+    </release>
     <release version="0.0.43" date="2026-09-29">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.0.43</url>
       <description>
