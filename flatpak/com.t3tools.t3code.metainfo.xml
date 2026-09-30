@@ -15,7 +15,9 @@
   <releases>
     <release version="0.0.44" date="2026-09-29">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.0.44</url>
-      <description></description>
+      <description>
+        <p>Update to T3 Code 0.0.44.</p>
+      </description>
     </release>
     <release version="0.0.43" date="2026-09-29">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.0.43</url>
@@ -36,7 +38,7 @@
         app's Flatpak directory.</p>
       </description>
     </release>
-    <release version="0.0.42" date="2026-09-19"/>
+    <release version="0.0.42" date="2026-09-19" />
   </releases>
-  <content_rating type="oars-1.1"/>
+  <content_rating type="oars-1.1" />
 </component>

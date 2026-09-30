@@ -8,7 +8,7 @@ build-options:
   env:
     npm_config_nodedir: /usr/lib/sdk/node24
     # Version stamping must not trigger an automatic install after the frozen install.
-    pnpm_config_verify_deps_before_run: 'false'
+    pnpm_config_verify_deps_before_run: "false"
 build-commands:
   - pnpm install --frozen-lockfile
   # Upstream stamps release versions in CI; the tagged sources still have the previous version.
@@ -33,7 +33,7 @@ build-commands:
       install -d "$icon_dir"
       magick assets/prod/black-universal-1024.png -resize "${size}x${size}" "$icon_dir/com.t3tools.t3code.png"
     done
-test-rule: ''
+test-rule: ""
 test-commands:
   # Electron's npm package can use the binary built for this Flatpak.
   - ln -s t3code flatpak-output/linux-unpacked/electron
@@ -56,7 +56,7 @@ sources:
       type: json
       url: https://api.github.com/repos/pingdotgg/t3code/releases/latest
       tag-query: .tag_name
-      version-query: $tag | ltrimstr("v")
+      version-query: '$tag | ltrimstr("v")'
       timestamp-query: .published_at
       is-main-source: true
       release-url-template: https://github.com/pingdotgg/t3code/releases/tag/v$version
