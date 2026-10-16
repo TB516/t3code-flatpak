@@ -38,10 +38,10 @@ index b306975be..7f70a3cfc 100644
  
 diff --git a/apps/desktop/src/backend/flatpakBackend.test.ts b/apps/desktop/src/backend/flatpakBackend.test.ts
 new file mode 100644
-index 000000000..0a940012a
+index 000000000..cfc536d2e
 --- /dev/null
 +++ b/apps/desktop/src/backend/flatpakBackend.test.ts
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,86 @@
 +import { assert, describe, it } from "@effect/vitest";
 +import * as Option from "effect/Option";
 +
@@ -53,7 +53,7 @@ index 000000000..0a940012a
 +  entryPath: "/app/server/bin.mjs",
 +  args: ["/app/server/bin.mjs", "--bootstrap-fd", "3"],
 +  cwd: "/home/alice",
-+  env: { ELECTRON_RUN_AS_NODE: "1", T3CODE_CLI_PATH: "/home/alice/.var/app/com.t3tools.t3code/data/t3/bin/t3" },
++  env: { ELECTRON_RUN_AS_NODE: "1" },
 +  extendEnv: true,
 +  bootstrap: {
 +    mode: "desktop",
@@ -99,7 +99,6 @@ index 000000000..0a940012a
 +      `--env=T3CODE_FLATPAK_SERVER=${runtime}/t3code`,
 +      `--env=T3CODE_FLATPAK_ENTRY=${runtime}/resources/app.asar/apps/server/dist/bin.mjs`,
 +      `--env=T3CODE_FLATPAK_COMPILE_CACHE=${runtime}/resources/app.asar/apps/desktop/dist-electron/compileCache.cjs`,
-+      `--env=T3CODE_CLI_PATH=${config.env.T3CODE_CLI_PATH}`,
 +      "--env=PATH=/home/alice/.local/bin:/usr/bin",
 +      "/bin/sh",
 +      `${runtime}/host-server.sh`,
@@ -131,10 +130,10 @@ index 000000000..0a940012a
 +});
 diff --git a/apps/desktop/src/backend/flatpakBackend.ts b/apps/desktop/src/backend/flatpakBackend.ts
 new file mode 100644
-index 000000000..bc8c61a2d
+index 000000000..e912b2119
 --- /dev/null
 +++ b/apps/desktop/src/backend/flatpakBackend.ts
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,56 @@
 +import * as Option from "effect/Option";
 +
 +import type { DesktopBackendStartConfig } from "./DesktopBackendManager.ts";
@@ -178,7 +177,6 @@ index 000000000..bc8c61a2d
 +      `--env=T3CODE_FLATPAK_SERVER=${runtimeDir}/t3code`,
 +      `--env=T3CODE_FLATPAK_ENTRY=${runtimeDir}/resources/app.asar/apps/server/dist/bin.mjs`,
 +      `--env=T3CODE_FLATPAK_COMPILE_CACHE=${runtimeDir}/resources/app.asar/apps/desktop/dist-electron/compileCache.cjs`,
-+      ...(config.env.T3CODE_CLI_PATH ? [`--env=T3CODE_CLI_PATH=${config.env.T3CODE_CLI_PATH}`] : []),
 +      ...(hostPath?.trim() ? [`--env=PATH=${hostPath}`] : []),
 +      "/bin/sh",
 +      `${runtimeDir}/host-server.sh`,
