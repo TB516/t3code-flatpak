@@ -1,16 +1,3 @@
-diff --git a/apps/mobile/src/features/browser/PreviewStreamWebView.tsx b/apps/mobile/src/features/browser/PreviewStreamWebView.tsx
-index 081e81f13..3c997cda7 100644
---- a/apps/mobile/src/features/browser/PreviewStreamWebView.tsx
-+++ b/apps/mobile/src/features/browser/PreviewStreamWebView.tsx
-@@ -510,7 +510,7 @@ function PreviewStreamDocumentView({
-               {status === "error" ? error : "Connecting to browser..."}
-             </AppText>
-           )}
--          {status === "error" && hostSetup && !compact ? (
-+          {status === "error" && hostSetup?.command && !compact ? (
-             <Pressable
-               accessibilityRole="button"
-               accessibilityLabel={`Copy ${hostSetup.command}`}
 diff --git a/apps/server/src/preview/PreviewBrowserHost.test.ts b/apps/server/src/preview/PreviewBrowserHost.test.ts
 index 5ae0a7075..36351fd9b 100644
 --- a/apps/server/src/preview/PreviewBrowserHost.test.ts
