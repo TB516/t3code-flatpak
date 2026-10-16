@@ -50,6 +50,7 @@ test-commands:
     src/process/externalLauncher.test.ts
     src/cloud/selfUpdate.test.ts
     src/environment/ServerEnvironment.test.ts
+    src/preview/PreviewBrowserHost.test.ts
   - pnpm --filter t3 typecheck
 sources:
   - type: git
@@ -74,6 +75,7 @@ sources:
       - ../../patches/0007-flatpak-editor-discovery.patch
       - ../../patches/0008-flatpak-cli-launcher.patch
       - ../../patches/0009-flatpak-server-updates.patch
+      - ../../patches/0010-flatpak-browser-requirements.patch
     use-git: true
   - type: dir
     path: ../package
