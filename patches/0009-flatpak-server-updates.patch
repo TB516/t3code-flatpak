@@ -1,0 +1,132 @@
+diff --git a/apps/server/src/cloud/selfUpdate.test.ts b/apps/server/src/cloud/selfUpdate.test.ts
+index 443fad607..8a13118a4 100644
+--- a/apps/server/src/cloud/selfUpdate.test.ts
++++ b/apps/server/src/cloud/selfUpdate.test.ts
+@@ -128,6 +128,28 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
+ });
+ 
+ it.layer(NodeServices.layer)("server self update", (it) => {
++  it.effect("rejects Flatpak updates and commits before invoking any updater", () =>
++    Effect.gen(function* () {
++      const { selfUpdate, order } = yield* makeHarness({
++        mode: "desktop",
++        desktopAppUpdate: {
++          available: true,
++          run: () => Effect.die("must not start a desktop update"),
++          commit: () => Effect.die("must not commit a desktop update"),
++        },
++      }).pipe(
++        Effect.provideService(HostProcess.Environment, {
++          T3CODE_FLATPAK_SERVER: "/installed/flatpak/t3code",
++        }),
++      );
++      const error = yield* Effect.flip(selfUpdate.update({ targetVersion: "1.1.0" }));
++      expect(error.reason).toContain("Flatpak");
++      const commitError = yield* Effect.flip(selfUpdate.commitDesktopUpdate("request"));
++      expect(commitError.reason).toContain("Flatpak");
++      expect(order).toEqual([]);
++    }).pipe(Effect.scoped),
++  );
++
+   it.effect("marks running threads at the boot-service handoff", () =>
+     Effect.gen(function* () {
+       const events: string[] = [];
+diff --git a/apps/server/src/cloud/selfUpdate.ts b/apps/server/src/cloud/selfUpdate.ts
+index 615351c43..965adca86 100644
+--- a/apps/server/src/cloud/selfUpdate.ts
++++ b/apps/server/src/cloud/selfUpdate.ts
+@@ -185,6 +185,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+     yield* Config.String(CLI_RELEASE_BASE_URL_ENV).pipe(Config.option),
+   );
+   const inFlight = yield* Ref.make(false);
++  const flatpakManaged = Boolean((yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER);
+ 
+   const capability: ServerSelfUpdateCapability | null =
+     serverConfig.mode === "desktop" ? "desktop-managed" : launcher.managed ? "boot-service" : null;
+@@ -196,6 +197,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+   const update: ServerSelfUpdate["Service"]["update"] = Effect.fn(
+     "cloud.server_self_update.update",
+   )(function* (input, reportProgress = () => Effect.void, onHandoffAccepted = () => Effect.void) {
++    if (flatpakManaged) {
++      return yield* failWith(
++        "Updates are managed by Flatpak. Update the Flatpak package on this machine.",
++      );
++    }
+     if (capability === "desktop-managed") {
+       // input.targetVersion is meaningless here: the desktop app's own
+       // update feed decides what it downloads, and the result carries what
+@@ -337,7 +343,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+   return ServerSelfUpdate.of({
+     update,
+     commitDesktopUpdate: (requestId, onHandoffAccepted) =>
+-      desktopAppUpdate.commit(requestId, onHandoffAccepted),
++      flatpakManaged
++        ? Effect.fail(
++            failWith("Updates are managed by Flatpak. Update the Flatpak package on this machine."),
++          )
++        : desktopAppUpdate.commit(requestId, onHandoffAccepted),
+   });
+ });
+ 
+diff --git a/apps/server/src/environment/ServerEnvironment.test.ts b/apps/server/src/environment/ServerEnvironment.test.ts
+index a77802357..43b6f793b 100644
+--- a/apps/server/src/environment/ServerEnvironment.test.ts
++++ b/apps/server/src/environment/ServerEnvironment.test.ts
+@@ -96,7 +96,11 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
+       yield* fs.symlink(entry, `${prefix}/bin/t3`);
+       const config = yield* makeServerConfig(baseDir);
+       yield* fs.makeDirectory(config.stateDir, { recursive: true });
+-      for (const mode of ["web", "desktop"] as const) {
++      for (const { mode, flatpakManaged } of [
++        { mode: "web", flatpakManaged: false },
++        { mode: "desktop", flatpakManaged: false },
++        { mode: "desktop", flatpakManaged: true },
++      ] as const) {
+         const descriptor = yield* Effect.gen(function* () {
+           const environment = yield* ServerEnvironment.ServerEnvironment;
+           return yield* environment.getDescriptor;
+@@ -104,13 +108,15 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
+           Effect.provide(
+             ServerEnvironment.layer.pipe(
+               Layer.provide(layerEmptySecretStore),
+-              Layer.provide(ServerConfig.layer({ ...config, mode })),
++              Layer.provide(ServerConfig.layer({ ...config, mode, desktopTelemetryControlFd: 5 })),
+             ),
+           ),
+           Effect.provideService(HostProcess.Arguments, ["node", entry]),
+           Effect.provideService(HostProcess.IsExecutable, false),
+           Effect.provideService(HostProcess.Platform, "linux"),
+-          Effect.provideService(HostProcess.Environment, {}),
++          Effect.provideService(HostProcess.Environment, {
++            ...(flatpakManaged ? { T3CODE_FLATPAK_SERVER: "/installed/flatpak/t3code" } : {}),
++          }),
+         );
+         expect(descriptor.capabilities.serverInstallation).toEqual(
+           mode === "web" ? { kind: "npm-global", prefix } : undefined,
+@@ -118,6 +124,9 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
+         expect(descriptor.capabilities.serverSelfUpdate).toBe(
+           mode === "web" ? undefined : "desktop-managed",
+         );
++        expect(descriptor.capabilities.desktopAppUpdate).toBe(
++          mode === "desktop" && !flatpakManaged ? true : undefined,
++        );
+         expect(descriptor.capabilities).toMatchObject({
+           settledWorktreeCleanup: true,
+           storageCleanupRun: true,
+diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
+index 8e635f981..989a8b63d 100644
+--- a/apps/server/src/environment/ServerEnvironment.ts
++++ b/apps/server/src/environment/ServerEnvironment.ts
+@@ -202,8 +202,11 @@ export const make = Effect.gen(function* () {
+   // app and its bundled server ship in one artifact, so a present fd means
+   // the app speaks the requestDesktopUpdate protocol. WSL backends never get
+   // the fd and correctly do not advertise.
++  const flatpakManaged = Boolean((yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER);
+   const desktopAppUpdate =
+-    serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
++    !flatpakManaged &&
++    serverSelfUpdate === "desktop-managed" &&
++    serverConfig.desktopTelemetryControlFd !== undefined;
+ 
+   const descriptor: ExecutionEnvironmentDescriptor = {
+     environmentId,

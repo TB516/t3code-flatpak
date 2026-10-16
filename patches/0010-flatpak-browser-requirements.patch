@@ -1,0 +1,187 @@
+diff --git a/apps/server/src/preview/PreviewBrowserHost.test.ts b/apps/server/src/preview/PreviewBrowserHost.test.ts
+index 5ae0a7075..36351fd9b 100644
+--- a/apps/server/src/preview/PreviewBrowserHost.test.ts
++++ b/apps/server/src/preview/PreviewBrowserHost.test.ts
+@@ -73,6 +73,21 @@ const diagnose = (input: {
+ };
+ 
+ describe("diagnoseLaunchFailure", () => {
++  it.effect.each([
++    { output: SANDBOX_ABORT, ldd: "", instruction: "AppArmor profile" },
++    { output: LOADER_ERROR, ldd: LDD_IN_BARE_DEBIAN, instruction: "libglib-2.0.so.0" },
++  ])("gives Flatpak users manual setup instructions for $instruction", (input) =>
++    Effect.gen(function* () {
++      const { error } = yield* diagnose({ platform: "linux", ...input }).pipe(
++        Effect.provideService(HostProcess.Environment, {
++          T3CODE_FLATPAK_SERVER: "/installed/flatpak/t3code",
++        }),
++      );
++      expect(error?.message).toContain(input.instruction);
++      expect(error?.message).not.toContain("t3 browser setup");
++    }),
++  );
++
+   it.effect("turns Chrome's sandbox abort into the AppArmor steps", () =>
+     Effect.gen(function* () {
+       const { error, commands } = yield* diagnose({
+diff --git a/apps/server/src/preview/PreviewBrowserHost.ts b/apps/server/src/preview/PreviewBrowserHost.ts
+index de136cf41..53ad43441 100644
+--- a/apps/server/src/preview/PreviewBrowserHost.ts
++++ b/apps/server/src/preview/PreviewBrowserHost.ts
+@@ -71,18 +71,24 @@ export const DEBIAN_PACKAGES: ReadonlyArray<ReadonlyArray<string>> = [
+ 
+ export class PreviewBrowserSandboxError extends Schema.TaggedError<PreviewBrowserSandboxError>()(
+   "PreviewBrowserSandboxError",
+-  { setupCommand: Schema.String },
++  { setupCommand: Schema.NullOr(Schema.String) },
+ ) {
+   override get message(): string {
++    if (this.setupCommand === null) {
++      return "This host blocks the sandbox T3's headless browser needs. Configure an AppArmor profile on the host to allow unprivileged user namespaces for T3's downloaded chrome-headless-shell. The Flatpak package does not change host security configuration.";
++    }
+     return `This host blocks the sandbox T3's browser runs in (AppArmor on Ubuntu 23.10+). Run \`${this.setupCommand}\` on the host once to allow it, then try again.`;
+   }
+ }
+ 
+ export class PreviewBrowserLibrariesError extends Schema.TaggedError<PreviewBrowserLibrariesError>()(
+   "PreviewBrowserLibrariesError",
+-  { setupCommand: Schema.String, libraries: Schema.Array(Schema.String) },
++  { setupCommand: Schema.NullOr(Schema.String), libraries: Schema.Array(Schema.String) },
+ ) {
+   override get message(): string {
++    if (this.setupCommand === null) {
++      return `This host is missing libraries T3's headless browser needs (${this.libraries.join(", ")}). Install them using your host's package management tools, then try again. The Flatpak package does not install host libraries.`;
++    }
+     return `This host is missing libraries T3's browser needs (${this.libraries.join(", ")}). Run \`${this.setupCommand}\` on the host to install them, then try again.`;
+   }
+ }
+@@ -104,7 +110,9 @@ export const diagnoseLaunchFailure = Effect.fn("PreviewBrowserHost.diagnoseLaunc
+     readonly output: string;
+     readonly setupCommand: string;
+   }) {
+-    const { setupCommand } = input;
++    const setupCommand = (yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER
++      ? null
++      : input.setupCommand;
+     if (input.output.includes(NO_SANDBOX_SIGNATURE)) {
+       return new PreviewBrowserSandboxError({ setupCommand });
+     }
+diff --git a/apps/server/src/preview/ServerBrowser.ts b/apps/server/src/preview/ServerBrowser.ts
+index 87789692e..259aab1fd 100644
+--- a/apps/server/src/preview/ServerBrowser.ts
++++ b/apps/server/src/preview/ServerBrowser.ts
+@@ -2477,7 +2477,9 @@ const make = Effect.gen(function* () {
+     (yield* PreviewBrowserHost.sandboxBlocked)
+   ) {
+     yield* Effect.logWarning(
+-      `This host blocks the sandbox T3's browser runs in, so browser tabs and HTML previews will not start. Run \`${setupCommand}\` once to allow it.`,
++      new PreviewBrowserHost.PreviewBrowserSandboxError({
++        setupCommand: (yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER ? null : setupCommand,
++      }).message,
+     );
+   }
+   // The desktop took its page back (closed, swapped, crashed, or devtools opened).
+diff --git a/apps/server/src/preview/ServerBrowserStream.test.ts b/apps/server/src/preview/ServerBrowserStream.test.ts
+index 8fc153d9e..e8e4098e2 100644
+--- a/apps/server/src/preview/ServerBrowserStream.test.ts
++++ b/apps/server/src/preview/ServerBrowserStream.test.ts
+@@ -306,6 +306,17 @@ it.effect("passes uploaded files to the page's open picker and needs operate sco
+ const decodeHostSetup = Schema.decodeUnknownEffect(Schema.fromJsonString(PreviewStreamHostSetup));
+ 
+ it.effect.each([
++  {
++    error: new PreviewBrowserHost.PreviewBrowserSandboxError({ setupCommand: null }),
++    need: "sandbox",
++  },
++  {
++    error: new PreviewBrowserHost.PreviewBrowserLibrariesError({
++      setupCommand: null,
++      libraries: ["libnss3.so"],
++    }),
++    need: "libraries",
++  },
+   {
+     error: new PreviewBrowserHost.PreviewBrowserSandboxError({
+       setupCommand: "sudo t3 browser setup",
+@@ -319,7 +330,7 @@ it.effect.each([
+     }),
+     need: "libraries",
+   },
+-])("tells viewers the command that sets up the host ($need)", ({ error, need }) =>
++])("reports host setup with a command only when one is available ($need)", ({ error, need }) =>
+   Effect.gen(function* () {
+     const browser = ServerBrowser.ServerBrowser.of({
+       clearProfile: () => Effect.void,
+@@ -359,7 +370,7 @@ it.effect.each([
+     expect(code).toBe(PREVIEW_STREAM_HOST_SETUP_CLOSE_CODE);
+     expect(yield* decodeHostSetup(reason)).toEqual({
+       need,
+-      command: "sudo t3 browser setup",
++      command: error.setupCommand ?? "",
+     });
+   }).pipe(Effect.scoped),
+ );
+diff --git a/apps/server/src/preview/ServerBrowserStream.ts b/apps/server/src/preview/ServerBrowserStream.ts
+index b2960c240..87d0e1570 100644
+--- a/apps/server/src/preview/ServerBrowserStream.ts
++++ b/apps/server/src/preview/ServerBrowserStream.ts
+@@ -203,9 +203,9 @@ const makeHandler = (browser: ServerBrowser.ServerBrowser["Service"]) =>
+ /** Which host setup a launch failure is missing, and the command that fixes it. */
+ const hostSetup = (cause: unknown): PreviewStreamHostSetup | undefined =>
+   isSandboxError(cause)
+-    ? { need: "sandbox", command: cause.setupCommand }
++    ? { need: "sandbox", command: cause.setupCommand ?? "" }
+     : isLibrariesError(cause)
+-      ? { need: "libraries", command: cause.setupCommand }
++      ? { need: "libraries", command: cause.setupCommand ?? "" }
+       : undefined;
+ const isSandboxError = Schema.is(PreviewBrowserHost.PreviewBrowserSandboxError);
+ const isLibrariesError = Schema.is(PreviewBrowserHost.PreviewBrowserLibrariesError);
+diff --git a/apps/web/src/browser/ServerBrowserSurface.tsx b/apps/web/src/browser/ServerBrowserSurface.tsx
+index b8f403598..a07843935 100644
+--- a/apps/web/src/browser/ServerBrowserSurface.tsx
++++ b/apps/web/src/browser/ServerBrowserSurface.tsx
+@@ -892,7 +892,9 @@ export function ServerBrowserSurface(props: {
+           <p role="alert" className="max-w-sm text-sm text-muted-foreground">
+             {previewStreamHostSetupMessage(hostSetup)}
+           </p>
+-          <CommandBlock command={hostSetup.command} className="w-full max-w-md text-left" />
++          {hostSetup.command ? (
++            <CommandBlock command={hostSetup.command} className="w-full max-w-md text-left" />
++          ) : null}
+           <Button variant="outline" size="sm" onClick={() => setHostSetup(null)}>
+             Try again
+           </Button>
+diff --git a/packages/client-runtime/src/preview/serverBrowserStream.ts b/packages/client-runtime/src/preview/serverBrowserStream.ts
+index 34a378697..6b995950b 100644
+--- a/packages/client-runtime/src/preview/serverBrowserStream.ts
++++ b/packages/client-runtime/src/preview/serverBrowserStream.ts
+@@ -476,7 +476,13 @@ const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
+ };
+ 
+ /** What a viewer tells the person; `command` is shown beside it, ready to copy. */
+-export const previewStreamHostSetupMessage = (setup: PreviewStreamHostSetup) =>
+-  setup.need === "sandbox"
++export const previewStreamHostSetupMessage = (setup: PreviewStreamHostSetup) => {
++  if (!setup.command) {
++    return setup.need === "sandbox"
++      ? "This server's headless browser needs an AppArmor profile configured on its host. Configure it manually, then try again."
++      : "This server's headless browser needs additional libraries on its host. Install the missing libraries with the host's package management tools, then try again.";
++  }
++  return setup.need === "sandbox"
+     ? "This server's host blocks the sandbox its browser runs in. Run this once on the host, then try again:"
+     : "This server's host is missing libraries its browser needs. Run this once on the host, then try again:";
++};
+diff --git a/packages/contracts/src/preview.ts b/packages/contracts/src/preview.ts
+index 802bbd476..126fa9af8 100644
+--- a/packages/contracts/src/preview.ts
++++ b/packages/contracts/src/preview.ts
+@@ -188,7 +188,7 @@ export type PreviewRuntime = typeof PreviewRuntime.Type;
+  */
+ export const PreviewStreamHostSetup = Schema.Struct({
+   need: Schema.Literals(["sandbox", "libraries"]),
+-  /** For example `sudo npx t3 browser setup`, matching how the server was launched. */
++  /** For example `sudo npx t3 browser setup`. Empty when host setup must be done manually. */
+   command: Schema.String,
+ });
+ export type PreviewStreamHostSetup = typeof PreviewStreamHostSetup.Type;

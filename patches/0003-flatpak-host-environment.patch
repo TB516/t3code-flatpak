@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-index 6a369a45..6ebdaf06 100644
+index 6efe81757..c453e6274 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-@@ -100,6 +100,21 @@ function runShellEnvironment(input: {
+@@ -120,6 +120,21 @@ function runShellEnvironment(input: {
  }
  
  describe("DesktopShellEnvironment", () => {
@@ -21,22 +21,22 @@ index 6a369a45..6ebdaf06 100644
 +    }).pipe(Effect.tap(() => Effect.sync(() => assert.equal(env.PATH, "/app/bin:/usr/bin"))));
 +  });
 +
-   it.effect("hydrates PATH and missing SSH_AUTH_SOCK from the login shell on macOS", () =>
+   it.effect("rejects PATH output from a failed shell and tries the next candidate", () =>
      Effect.gen(function* () {
-       const env: NodeJS.ProcessEnv = {
+       const env: NodeJS.ProcessEnv = { SHELL: "/bin/failing", PATH: "/usr/bin" };
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.ts b/apps/desktop/src/shell/DesktopShellEnvironment.ts
-index 704b061d..71b33253 100644
+index 2b41b6ea7..dfe68ac88 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.ts
-@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
- import * as ChildProcess from "effect/unstable/process/ChildProcess";
- import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+@@ -10,6 +10,7 @@ import * as Stream from "effect/Stream";
+ import * as ChildProcess from "effect/process/ChildProcess";
+ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
  
 +import { flatpakAppId } from "../app/Flatpak.ts";
  import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
  
  type EnvironmentPatch = Record<string, string>;
-@@ -500,6 +501,7 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
+@@ -515,6 +516,7 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
  const installShellEnvironment = (
    config: ShellEnvironmentConfig,
  ): Effect.Effect<void, never, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> => {
@@ -45,7 +45,7 @@ index 704b061d..71b33253 100644
      return installWindowsEnvironment(config);
    }
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index 9745662c..39c39503 100644
+index 26ad0f1c4..fc5f324df 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
 @@ -1,4 +1,4 @@
@@ -84,7 +84,7 @@ index 9745662c..39c39503 100644
      const cause = Cause.combine(
        Cause.fail(new Error("updater failed")),
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index 245925a6..3aac79ec 100644
+index 77069d3ba..03ff73f2a 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
 @@ -1,3 +1,4 @@
@@ -92,7 +92,7 @@ index 245925a6..3aac79ec 100644
  import {
    DESKTOP_UPDATE_RESTART_MARKER_FILE,
    DesktopUpdateChannelSchema,
-@@ -254,6 +255,9 @@ function getAutoUpdateDisabledReason(args: {
+@@ -321,6 +322,9 @@ function getAutoUpdateDisabledReason(args: {
    disabledByEnv: boolean;
    hasUpdateFeedConfig: boolean;
  }): string | null {

@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/electron/ElectronDialog.test.ts b/apps/desktop/src/electron/ElectronDialog.test.ts
-index 2ed5a1f2f..321003f9f 100644
+index 2ed5a1f2f..aa1b59fde 100644
 --- a/apps/desktop/src/electron/ElectronDialog.test.ts
 +++ b/apps/desktop/src/electron/ElectronDialog.test.ts
 @@ -3,7 +3,7 @@ import * as Cause from "effect/Cause";
@@ -92,7 +92,7 @@ index 2ed5a1f2f..321003f9f 100644
      Effect.gen(function* () {
        const cause = new Error("folder picker failed");
 diff --git a/apps/desktop/src/electron/ElectronDialog.ts b/apps/desktop/src/electron/ElectronDialog.ts
-index 182803337..baa503e20 100644
+index b48953f11..2e868e089 100644
 --- a/apps/desktop/src/electron/ElectronDialog.ts
 +++ b/apps/desktop/src/electron/ElectronDialog.ts
 @@ -1,3 +1,7 @@
@@ -103,7 +103,7 @@ index 182803337..baa503e20 100644
  import * as Context from "effect/Context";
  import * as Effect from "effect/Effect";
  import * as Layer from "effect/Layer";
-@@ -6,6 +9,58 @@ import * as Schema from "effect/Schema";
+@@ -6,6 +10,58 @@ import * as Schema from "effect/Schema";
  
  import * as Electron from "electron";
  
@@ -162,7 +162,7 @@ index 182803337..baa503e20 100644
  export class ElectronDialogPickFolderError extends Schema.TaggedError<ElectronDialogPickFolderError>()(
    "ElectronDialogPickFolderError",
    {
-@@ -136,7 +191,21 @@ export const make = ElectronDialog.of({
+@@ -138,7 +194,21 @@ export const make = ElectronDialog.of({
      if (result.canceled) {
        return Option.none();
      }

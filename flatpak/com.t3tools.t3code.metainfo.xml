@@ -9,10 +9,20 @@
     <p>An unofficial Flatpak package for T3 Code. The desktop runs inside
     Flatpak and starts its matching T3 server on the host, where coding agents
     can use your projects and development tools.</p>
+    <p>Headless browser features, including HTML preview screenshots and some
+    recording tasks, download and run Chromium on the host. Your system must
+    provide Chromium's runtime libraries, including NSS, GLib, accessibility,
+    graphics, and ALSA libraries. Systems that restrict unprivileged user
+    namespaces through AppArmor may also require a manually configured
+    AppArmor profile to allow Chromium's sandbox to run.</p>
   </description>
   <launchable type="desktop-id">com.t3tools.t3code.desktop</launchable>
   <url type="homepage">https://t3.codes</url>
   <releases>
+    <release version="0.1.0" date="2026-10-15">
+      <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.0</url>
+      <description></description>
+    </release>
     <release version="0.0.45" date="2026-10-02">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.0.45</url>
       <description>
