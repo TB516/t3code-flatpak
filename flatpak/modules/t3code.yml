@@ -51,6 +51,7 @@ test-commands:
     src/cloud/selfUpdate.test.ts
     src/environment/ServerEnvironment.test.ts
     src/preview/PreviewBrowserHost.test.ts
+    src/preview/ServerBrowserStream.test.ts
   - pnpm --filter t3 typecheck
 sources:
   - type: git
