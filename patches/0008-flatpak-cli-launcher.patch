@@ -1,0 +1,31 @@
+diff --git a/apps/desktop/src/app/DesktopCliShim.ts b/apps/desktop/src/app/DesktopCliShim.ts
+index 5cd942f66..60c5d3b6e 100644
+--- a/apps/desktop/src/app/DesktopCliShim.ts
++++ b/apps/desktop/src/app/DesktopCliShim.ts
+@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
+ import * as FileSystem from "effect/FileSystem";
+ import * as Option from "effect/Option";
+ 
++import { flatpakAppId } from "./Flatpak.ts";
+ import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+ import { makeComponentLogger } from "./DesktopObservability.ts";
+ 
+@@ -157,7 +158,17 @@ export const install = Effect.gen(function* () {
+         // macOS and .deb installs live at a fixed path, so the launcher runs the app directly.
+         onNone: () => ({ kind: "direct" as const, executable: process.execPath, entry }),
+       });
+-  const content = renderCliShim({ target, shimPath, t3Home: environment.baseDir });
++  const runtimeDir = process.env.T3CODE_FLATPAK_RUNTIME;
++  // Commands shown by the host server run outside the sandbox, where /app does not exist.
++  const hostTarget: CliShimTarget =
++    flatpakAppId(process.env, environment.platform) !== null && runtimeDir?.startsWith("/")
++      ? {
++          kind: "direct",
++          executable: `${runtimeDir}/t3code`,
++          entry: `${runtimeDir}/resources/app.asar/${SERVER_ENTRY}`,
++        }
++      : target;
++  const content = renderCliShim({ target: hostTarget, shimPath, t3Home: environment.baseDir });
+ 
+   return yield* Effect.gen(function* () {
+     const existing = yield* fs.readFileString(shimPath).pipe(Effect.option);

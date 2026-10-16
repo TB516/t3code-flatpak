@@ -68,6 +68,7 @@ sources:
       - ../../patches/0005-flatpak-build-artifact.patch
       - ../../patches/0006-flatpak-document-portal-paths.patch
       - ../../patches/0007-flatpak-editor-discovery.patch
+      - ../../patches/0008-flatpak-cli-launcher.patch
     use-git: true
   - type: dir
     path: ../package

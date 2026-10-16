@@ -25,7 +25,7 @@ esac
 # then pass only PATH back to the host server through flatpak-spawn.
 host_path=$(
     /usr/bin/flatpak-spawn --host "${SHELL:-/bin/sh}" -ilc 'printf %s "$PATH"' \
-        3>&- 4>&- 5>&- 2>/dev/null || true
+        3>&- 4>&- 5>&- 6>&- 7>&- 2>/dev/null || true
 )
 if [ -n "$host_path" ]; then
     export T3CODE_FLATPAK_HOST_PATH="$host_path"

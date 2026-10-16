@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
-index c2012299..4edb253f 100644
+index b306975be..7f70a3cfc 100644
 --- a/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 +++ b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 @@ -1,5 +1,8 @@
@@ -9,9 +9,9 @@ index c2012299..4edb253f 100644
 +import { flatpakBackendConfig } from "./flatpakBackend.ts";
 +
  import { parsePersistedServerObservabilitySettings } from "@t3tools/shared/serverSettings";
- import * as Context from "effect/Context";
- import * as Crypto from "effect/Crypto";
-@@ -567,7 +570,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
+ import { currentDesktopBootstrapToken } from "@t3tools/shared/desktopBootstrapToken";
+ import * as Clock from "effect/Clock";
+@@ -584,7 +587,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
        ...buildObservabilityFragment(input.observabilitySettings),
      };
  
@@ -20,7 +20,7 @@ index c2012299..4edb253f 100644
        executablePath: process.execPath,
        // Packaged builds only, so a dev instance never shares the cache with the
        // prod app it is often run from. `--require` rather than NODE_COMPILE_CACHE,
-@@ -593,6 +596,15 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
+@@ -612,6 +615,15 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
        captureOutput: true,
        preflightFailure: Option.none(),
      } satisfies DesktopBackendManager.DesktopBackendStartConfig;
@@ -38,10 +38,10 @@ index c2012299..4edb253f 100644
  
 diff --git a/apps/desktop/src/backend/flatpakBackend.test.ts b/apps/desktop/src/backend/flatpakBackend.test.ts
 new file mode 100644
-index 00000000..4839d211
+index 000000000..0a940012a
 --- /dev/null
 +++ b/apps/desktop/src/backend/flatpakBackend.test.ts
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,87 @@
 +import { assert, describe, it } from "@effect/vitest";
 +import * as Option from "effect/Option";
 +
@@ -53,7 +53,7 @@ index 00000000..4839d211
 +  entryPath: "/app/server/bin.mjs",
 +  args: ["/app/server/bin.mjs", "--bootstrap-fd", "3"],
 +  cwd: "/home/alice",
-+  env: { ELECTRON_RUN_AS_NODE: "1" },
++  env: { ELECTRON_RUN_AS_NODE: "1", T3CODE_CLI_PATH: "/home/alice/.var/app/com.t3tools.t3code/data/t3/bin/t3" },
 +  extendEnv: true,
 +  bootstrap: {
 +    mode: "desktop",
@@ -62,10 +62,13 @@ index 00000000..4839d211
 +    host: "127.0.0.1",
 +    t3Home: "/home/alice/.var/app/com.t3tools.t3code/data/t3",
 +    desktopBootstrapToken: "test-token",
++    shellEnvironmentPrepared: true,
 +    tailscaleServeEnabled: false,
 +    tailscaleServePort: 443,
 +    desktopTelemetryFd: 4,
 +    desktopTelemetryControlFd: 5,
++    desktopBrowserFd: 6,
++    desktopBrowserControlFd: 7,
 +    resourceMonitorPath: "/app/resources/resource-monitor/t3-resource-monitor",
 +  },
 +  bootstrapDelivery: "fd3",
@@ -89,11 +92,14 @@ index 00000000..4839d211
 +      "--forward-fd=3",
 +      "--forward-fd=4",
 +      "--forward-fd=5",
++      "--forward-fd=6",
++      "--forward-fd=7",
 +      `--directory=${runtime}`,
 +      `--env=T3CODE_HOME=${config.bootstrap.t3Home}`,
 +      `--env=T3CODE_FLATPAK_SERVER=${runtime}/t3code`,
 +      `--env=T3CODE_FLATPAK_ENTRY=${runtime}/resources/app.asar/apps/server/dist/bin.mjs`,
 +      `--env=T3CODE_FLATPAK_COMPILE_CACHE=${runtime}/resources/app.asar/apps/desktop/dist-electron/compileCache.cjs`,
++      `--env=T3CODE_CLI_PATH=${config.env.T3CODE_CLI_PATH}`,
 +      "--env=PATH=/home/alice/.local/bin:/usr/bin",
 +      "/bin/sh",
 +      `${runtime}/host-server.sh`,
@@ -105,6 +111,9 @@ index 00000000..4839d211
 +    assert.equal(result.bootstrap.desktopBootstrapToken, "test-token");
 +    assert.equal(result.bootstrap.desktopTelemetryFd, 4);
 +    assert.equal(result.bootstrap.desktopTelemetryControlFd, 5);
++    assert.isFalse(result.bootstrap.shellEnvironmentPrepared);
++    assert.equal(result.bootstrap.desktopBrowserFd, 6);
++    assert.equal(result.bootstrap.desktopBrowserControlFd, 7);
 +    assert.equal(
 +      result.bootstrap.resourceMonitorPath,
 +      `${runtime}/resources/resource-monitor/t3-resource-monitor`,
@@ -122,10 +131,10 @@ index 00000000..4839d211
 +});
 diff --git a/apps/desktop/src/backend/flatpakBackend.ts b/apps/desktop/src/backend/flatpakBackend.ts
 new file mode 100644
-index 00000000..76d37f9e
+index 000000000..bc8c61a2d
 --- /dev/null
 +++ b/apps/desktop/src/backend/flatpakBackend.ts
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,57 @@
 +import * as Option from "effect/Option";
 +
 +import type { DesktopBackendStartConfig } from "./DesktopBackendManager.ts";
@@ -149,6 +158,8 @@ index 00000000..76d37f9e
 +  // Keep entryPath in the sandbox for preflight checks; pass host paths to the server.
 +  const bootstrap = {
 +    ...config.bootstrap,
++    // The sandbox skips shell hydration; the host server must prepare its own environment.
++    shellEnvironmentPrepared: false,
 +    resourceMonitorPath: `${runtimeDir}/resources/resource-monitor/t3-resource-monitor`,
 +  };
 +  return {
@@ -160,11 +171,14 @@ index 00000000..76d37f9e
 +      "--forward-fd=3",
 +      "--forward-fd=4",
 +      "--forward-fd=5",
++      "--forward-fd=6",
++      "--forward-fd=7",
 +      `--directory=${runtimeDir}`,
 +      `--env=T3CODE_HOME=${bootstrap.t3Home}`,
 +      `--env=T3CODE_FLATPAK_SERVER=${runtimeDir}/t3code`,
 +      `--env=T3CODE_FLATPAK_ENTRY=${runtimeDir}/resources/app.asar/apps/server/dist/bin.mjs`,
 +      `--env=T3CODE_FLATPAK_COMPILE_CACHE=${runtimeDir}/resources/app.asar/apps/desktop/dist-electron/compileCache.cjs`,
++      ...(config.env.T3CODE_CLI_PATH ? [`--env=T3CODE_CLI_PATH=${config.env.T3CODE_CLI_PATH}`] : []),
 +      ...(hostPath?.trim() ? [`--env=PATH=${hostPath}`] : []),
 +      "/bin/sh",
 +      `${runtimeDir}/host-server.sh`,

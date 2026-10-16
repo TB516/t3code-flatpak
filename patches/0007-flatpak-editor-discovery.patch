@@ -1,8 +1,8 @@
 diff --git a/apps/server/src/process/externalLauncher.test.ts b/apps/server/src/process/externalLauncher.test.ts
-index aab4d78f..0230bc5a 100644
+index 63e89541e..242d8c5ac 100644
 --- a/apps/server/src/process/externalLauncher.test.ts
 +++ b/apps/server/src/process/externalLauncher.test.ts
-@@ -159,6 +159,55 @@ it.effect("launches an installed editor with platform-safe arguments", () =>
+@@ -210,6 +210,55 @@ it.effect("launches an installed editor with platform-safe arguments", () =>
    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
  );
  
@@ -59,10 +59,10 @@ index aab4d78f..0230bc5a 100644
    it.effect.skipIf(windowsHost)(`launches Cursor in classic IDE mode on ${platform}`, () =>
      Effect.gen(function* () {
 diff --git a/apps/server/src/process/externalLauncher.ts b/apps/server/src/process/externalLauncher.ts
-index ab287e4d..20be8a1c 100644
+index 3f2dab8f4..5e2c9e15b 100644
 --- a/apps/server/src/process/externalLauncher.ts
 +++ b/apps/server/src/process/externalLauncher.ts
-@@ -125,6 +125,67 @@ const CommandLookupEnvConfig = Config.all({
+@@ -146,6 +146,67 @@ const CommandLookupEnvConfig = Config.all({
  const readBrowserLaunchEnv = BrowserLaunchEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
  const readCommandLookupEnv = CommandLookupEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
  
@@ -130,7 +130,7 @@ index ab287e4d..20be8a1c 100644
  function parseTargetPathAndPosition(target: string): Option.Option<TargetPathAndPosition> {
    const match = TARGET_WITH_POSITION_PATTERN.exec(target);
    if (!match?.[1] || !match[2]) {
-@@ -417,6 +478,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+@@ -446,6 +507,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
    FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
  > {
    const available: EditorId[] = [];
@@ -138,7 +138,7 @@ index ab287e4d..20be8a1c 100644
  
    for (const editor of EDITORS) {
      if (editor.commands === null) {
-@@ -427,7 +489,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+@@ -456,7 +518,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
      }
  
      const command = yield* resolveEditorCommand(editor, env);
@@ -147,7 +147,7 @@ index ab287e4d..20be8a1c 100644
        available.push(editor.id);
      }
    }
-@@ -529,8 +591,24 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
+@@ -558,8 +620,24 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
    }
  
    if (editorDef.commands) {
