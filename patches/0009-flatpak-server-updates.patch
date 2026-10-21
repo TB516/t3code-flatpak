@@ -1,5 +1,5 @@
 diff --git a/apps/server/src/cloud/selfUpdate.test.ts b/apps/server/src/cloud/selfUpdate.test.ts
-index 443fad607..8a13118a4 100644
+index 3a852c7bc..fd81bd5d1 100644
 --- a/apps/server/src/cloud/selfUpdate.test.ts
 +++ b/apps/server/src/cloud/selfUpdate.test.ts
 @@ -128,6 +128,28 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
@@ -32,18 +32,18 @@ index 443fad607..8a13118a4 100644
      Effect.gen(function* () {
        const events: string[] = [];
 diff --git a/apps/server/src/cloud/selfUpdate.ts b/apps/server/src/cloud/selfUpdate.ts
-index 615351c43..965adca86 100644
+index 10c2a7991..727feb6c7 100644
 --- a/apps/server/src/cloud/selfUpdate.ts
 +++ b/apps/server/src/cloud/selfUpdate.ts
-@@ -185,6 +185,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+@@ -187,6 +187,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
      yield* Config.String(CLI_RELEASE_BASE_URL_ENV).pipe(Config.option),
    );
    const inFlight = yield* Ref.make(false);
 +  const flatpakManaged = Boolean((yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER);
  
-   const capability: ServerSelfUpdateCapability | null =
-     serverConfig.mode === "desktop" ? "desktop-managed" : launcher.managed ? "boot-service" : null;
-@@ -196,6 +197,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+   // A managed server starting means its launcher has settled on a version, so runtimes left by
+   // earlier updates can go.
+@@ -211,6 +212,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
    const update: ServerSelfUpdate["Service"]["update"] = Effect.fn(
      "cloud.server_self_update.update",
    )(function* (input, reportProgress = () => Effect.void, onHandoffAccepted = () => Effect.void) {
@@ -53,9 +53,9 @@ index 615351c43..965adca86 100644
 +      );
 +    }
      if (capability === "desktop-managed") {
-       // input.targetVersion is meaningless here: the desktop app's own
-       // update feed decides what it downloads, and the result carries what
-@@ -337,7 +343,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+       if (desktopAppUpdate.available) {
+         return yield* desktopAppUpdate.run(reportProgress);
+@@ -349,7 +355,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
    return ServerSelfUpdate.of({
      update,
      commitDesktopUpdate: (requestId, onHandoffAccepted) =>
@@ -69,7 +69,7 @@ index 615351c43..965adca86 100644
  });
  
 diff --git a/apps/server/src/environment/ServerEnvironment.test.ts b/apps/server/src/environment/ServerEnvironment.test.ts
-index a77802357..43b6f793b 100644
+index b17668002..cc21bad86 100644
 --- a/apps/server/src/environment/ServerEnvironment.test.ts
 +++ b/apps/server/src/environment/ServerEnvironment.test.ts
 @@ -96,7 +96,11 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
@@ -114,13 +114,13 @@ index a77802357..43b6f793b 100644
            settledWorktreeCleanup: true,
            storageCleanupRun: true,
 diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index 8e635f981..989a8b63d 100644
+index fbb597056..6b1379d1f 100644
 --- a/apps/server/src/environment/ServerEnvironment.ts
 +++ b/apps/server/src/environment/ServerEnvironment.ts
 @@ -202,8 +202,11 @@ export const make = Effect.gen(function* () {
-   // app and its bundled server ship in one artifact, so a present fd means
-   // the app speaks the requestDesktopUpdate protocol. WSL backends never get
-   // the fd and correctly do not advertise.
+   // app and its bundled server ship in one artifact, so a present fd means the
+   // app speaks the requestDesktopUpdate protocol.
+ 
 +  const flatpakManaged = Boolean((yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER);
    const desktopAppUpdate =
 -    serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;

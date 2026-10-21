@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/app/DesktopCliCommand.test.ts b/apps/desktop/src/app/DesktopCliCommand.test.ts
-index b2305fe98..14d6857e3 100644
+index 7b44fab01..82b91f7a3 100644
 --- a/apps/desktop/src/app/DesktopCliCommand.test.ts
 +++ b/apps/desktop/src/app/DesktopCliCommand.test.ts
 @@ -1,5 +1,5 @@
@@ -9,7 +9,7 @@ index b2305fe98..14d6857e3 100644
  import * as Effect from "effect/Effect";
  import * as FileSystem from "effect/FileSystem";
  import * as Option from "effect/Option";
-@@ -95,6 +95,36 @@ afterEach(() => {
+@@ -93,6 +93,36 @@ afterEach(() => {
  });
  
  it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
@@ -47,7 +47,7 @@ index b2305fe98..14d6857e3 100644
      Effect.gen(function* () {
        const fs = yield* FileSystem.FileSystem;
 diff --git a/apps/desktop/src/app/DesktopCliCommand.ts b/apps/desktop/src/app/DesktopCliCommand.ts
-index d79cab92f..d80daf5dc 100644
+index 294f8a8b9..b0f2b05db 100644
 --- a/apps/desktop/src/app/DesktopCliCommand.ts
 +++ b/apps/desktop/src/app/DesktopCliCommand.ts
 @@ -9,6 +9,7 @@ import * as Stream from "effect/Stream";
@@ -58,7 +58,7 @@ index d79cab92f..d80daf5dc 100644
  import * as DesktopCliShim from "./DesktopCliShim.ts";
  import * as DesktopEnvironment from "./DesktopEnvironment.ts";
  
-@@ -76,6 +77,17 @@ export class DesktopCliCommand extends Context.Service<
+@@ -67,6 +68,17 @@ export class DesktopCliCommand extends Context.Service<
  /** @public Service construction is part of the canonical Effect module API. */
  export const make = Effect.gen(function* () {
    const environment = yield* DesktopEnvironment.DesktopEnvironment;
@@ -77,7 +77,7 @@ index d79cab92f..d80daf5dc 100644
    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
    const path = environment.path;
 diff --git a/apps/desktop/src/app/DesktopCliShim.ts b/apps/desktop/src/app/DesktopCliShim.ts
-index 5cd942f66..9fa569993 100644
+index a9d9f04c4..f2c3787f1 100644
 --- a/apps/desktop/src/app/DesktopCliShim.ts
 +++ b/apps/desktop/src/app/DesktopCliShim.ts
 @@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
@@ -88,8 +88,8 @@ index 5cd942f66..9fa569993 100644
  import * as DesktopEnvironment from "./DesktopEnvironment.ts";
  import { makeComponentLogger } from "./DesktopObservability.ts";
  
-@@ -140,7 +141,9 @@ export const launcherPath = (environment: DesktopEnvironment.DesktopEnvironment[
-  */
+@@ -130,7 +131,9 @@ export const launcherPath = (environment: DesktopEnvironment.DesktopEnvironment[
+ 
  export const install = Effect.gen(function* () {
    const environment = yield* DesktopEnvironment.DesktopEnvironment;
 -  if (!environment.isPackaged) return Option.none<string>();

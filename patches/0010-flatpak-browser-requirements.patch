@@ -1,8 +1,8 @@
 diff --git a/apps/server/src/preview/PreviewBrowserHost.test.ts b/apps/server/src/preview/PreviewBrowserHost.test.ts
-index 5ae0a7075..36351fd9b 100644
+index 8c6b8b478..99ef56632 100644
 --- a/apps/server/src/preview/PreviewBrowserHost.test.ts
 +++ b/apps/server/src/preview/PreviewBrowserHost.test.ts
-@@ -73,6 +73,21 @@ const diagnose = (input: {
+@@ -75,6 +75,21 @@ const diagnose = (input: {
  };
  
  describe("diagnoseLaunchFailure", () => {
@@ -25,10 +25,10 @@ index 5ae0a7075..36351fd9b 100644
      Effect.gen(function* () {
        const { error, commands } = yield* diagnose({
 diff --git a/apps/server/src/preview/PreviewBrowserHost.ts b/apps/server/src/preview/PreviewBrowserHost.ts
-index de136cf41..53ad43441 100644
+index 179ba9a1d..5fe4890e7 100644
 --- a/apps/server/src/preview/PreviewBrowserHost.ts
 +++ b/apps/server/src/preview/PreviewBrowserHost.ts
-@@ -71,18 +71,24 @@ export const DEBIAN_PACKAGES: ReadonlyArray<ReadonlyArray<string>> = [
+@@ -57,18 +57,24 @@ export const DEBIAN_PACKAGES: ReadonlyArray<ReadonlyArray<string>> = [
  
  export class PreviewBrowserSandboxError extends Schema.TaggedError<PreviewBrowserSandboxError>()(
    "PreviewBrowserSandboxError",
@@ -55,7 +55,7 @@ index de136cf41..53ad43441 100644
      return `This host is missing libraries T3's browser needs (${this.libraries.join(", ")}). Run \`${this.setupCommand}\` on the host to install them, then try again.`;
    }
  }
-@@ -104,7 +110,9 @@ export const diagnoseLaunchFailure = Effect.fn("PreviewBrowserHost.diagnoseLaunc
+@@ -97,7 +103,9 @@ export const diagnoseLaunchFailure = Effect.fn("PreviewBrowserHost.diagnoseLaunc
      readonly output: string;
      readonly setupCommand: string;
    }) {
@@ -64,13 +64,13 @@ index de136cf41..53ad43441 100644
 +      ? null
 +      : input.setupCommand;
      if (input.output.includes(NO_SANDBOX_SIGNATURE)) {
-       return new PreviewBrowserSandboxError({ setupCommand });
-     }
+       // Playwright reports Chrome's refusal to sandbox as root as a sandbox failure too.
+       return (yield* HostProcess.UserId) === 0
 diff --git a/apps/server/src/preview/ServerBrowser.ts b/apps/server/src/preview/ServerBrowser.ts
-index 87789692e..259aab1fd 100644
+index 5b386e5f0..891c19884 100644
 --- a/apps/server/src/preview/ServerBrowser.ts
 +++ b/apps/server/src/preview/ServerBrowser.ts
-@@ -2477,7 +2477,9 @@ const make = Effect.gen(function* () {
+@@ -2457,7 +2457,9 @@ const make = Effect.gen(function* () {
      (yield* PreviewBrowserHost.sandboxBlocked)
    ) {
      yield* Effect.logWarning(
@@ -80,12 +80,12 @@ index 87789692e..259aab1fd 100644
 +      }).message,
      );
    }
-   // The desktop took its page back (closed, swapped, crashed, or devtools opened).
+ 
 diff --git a/apps/server/src/preview/ServerBrowserStream.test.ts b/apps/server/src/preview/ServerBrowserStream.test.ts
-index 8fc153d9e..e8e4098e2 100644
+index 6b2d24802..7e98804be 100644
 --- a/apps/server/src/preview/ServerBrowserStream.test.ts
 +++ b/apps/server/src/preview/ServerBrowserStream.test.ts
-@@ -306,6 +306,17 @@ it.effect("passes uploaded files to the page's open picker and needs operate sco
+@@ -377,6 +377,17 @@ it.effect("passes uploaded files to the page's open picker and needs operate sco
  const decodeHostSetup = Schema.decodeUnknownEffect(Schema.fromJsonString(PreviewStreamHostSetup));
  
  it.effect.each([
@@ -103,7 +103,7 @@ index 8fc153d9e..e8e4098e2 100644
    {
      error: new PreviewBrowserHost.PreviewBrowserSandboxError({
        setupCommand: "sudo t3 browser setup",
-@@ -319,7 +330,7 @@ it.effect.each([
+@@ -390,7 +401,7 @@ it.effect.each([
      }),
      need: "libraries",
    },
@@ -112,7 +112,7 @@ index 8fc153d9e..e8e4098e2 100644
    Effect.gen(function* () {
      const browser = ServerBrowser.ServerBrowser.of({
        clearProfile: () => Effect.void,
-@@ -359,7 +370,7 @@ it.effect.each([
+@@ -430,7 +441,7 @@ it.effect.each([
      expect(code).toBe(PREVIEW_STREAM_HOST_SETUP_CLOSE_CODE);
      expect(yield* decodeHostSetup(reason)).toEqual({
        need,
@@ -122,11 +122,11 @@ index 8fc153d9e..e8e4098e2 100644
    }).pipe(Effect.scoped),
  );
 diff --git a/apps/server/src/preview/ServerBrowserStream.ts b/apps/server/src/preview/ServerBrowserStream.ts
-index b2960c240..87d0e1570 100644
+index ad42eaf5d..02f9dc27b 100644
 --- a/apps/server/src/preview/ServerBrowserStream.ts
 +++ b/apps/server/src/preview/ServerBrowserStream.ts
-@@ -203,9 +203,9 @@ const makeHandler = (browser: ServerBrowser.ServerBrowser["Service"]) =>
- /** Which host setup a launch failure is missing, and the command that fixes it. */
+@@ -212,9 +212,9 @@ const makeHandler = Effect.fnUntraced(function* (browser: ServerBrowser.ServerBr
+ 
  const hostSetup = (cause: unknown): PreviewStreamHostSetup | undefined =>
    isSandboxError(cause)
 -    ? { need: "sandbox", command: cause.setupCommand }
@@ -138,10 +138,10 @@ index b2960c240..87d0e1570 100644
  const isSandboxError = Schema.is(PreviewBrowserHost.PreviewBrowserSandboxError);
  const isLibrariesError = Schema.is(PreviewBrowserHost.PreviewBrowserLibrariesError);
 diff --git a/apps/web/src/browser/ServerBrowserSurface.tsx b/apps/web/src/browser/ServerBrowserSurface.tsx
-index b8f403598..a07843935 100644
+index 27ae15e5e..5081b85b3 100644
 --- a/apps/web/src/browser/ServerBrowserSurface.tsx
 +++ b/apps/web/src/browser/ServerBrowserSurface.tsx
-@@ -892,7 +892,9 @@ export function ServerBrowserSurface(props: {
+@@ -872,7 +872,9 @@ export function ServerBrowserSurface(props: {
            <p role="alert" className="max-w-sm text-sm text-muted-foreground">
              {previewStreamHostSetupMessage(hostSetup)}
            </p>
@@ -153,13 +153,13 @@ index b8f403598..a07843935 100644
              Try again
            </Button>
 diff --git a/packages/client-runtime/src/preview/serverBrowserStream.ts b/packages/client-runtime/src/preview/serverBrowserStream.ts
-index 34a378697..6b995950b 100644
+index b71fff335..9d5ab790a 100644
 --- a/packages/client-runtime/src/preview/serverBrowserStream.ts
 +++ b/packages/client-runtime/src/preview/serverBrowserStream.ts
-@@ -476,7 +476,13 @@ const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
+@@ -454,7 +454,13 @@ const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
+   return { need: "sandbox", command: "sudo npx t3 browser setup" };
  };
  
- /** What a viewer tells the person; `command` is shown beside it, ready to copy. */
 -export const previewStreamHostSetupMessage = (setup: PreviewStreamHostSetup) =>
 -  setup.need === "sandbox"
 +export const previewStreamHostSetupMessage = (setup: PreviewStreamHostSetup) => {
@@ -173,15 +173,14 @@ index 34a378697..6b995950b 100644
      : "This server's host is missing libraries its browser needs. Run this once on the host, then try again:";
 +};
 diff --git a/packages/contracts/src/preview.ts b/packages/contracts/src/preview.ts
-index 802bbd476..126fa9af8 100644
+index 455663155..793b30a9f 100644
 --- a/packages/contracts/src/preview.ts
 +++ b/packages/contracts/src/preview.ts
-@@ -188,7 +188,7 @@ export type PreviewRuntime = typeof PreviewRuntime.Type;
+@@ -154,6 +154,7 @@ export type PreviewRuntime = typeof PreviewRuntime.Type;
   */
  export const PreviewStreamHostSetup = Schema.Struct({
    need: Schema.Literals(["sandbox", "libraries"]),
--  /** For example `sudo npx t3 browser setup`, matching how the server was launched. */
-+  /** For example `sudo npx t3 browser setup`. Empty when host setup must be done manually. */
++  /** Empty when host setup must be done manually. */
    command: Schema.String,
  });
  export type PreviewStreamHostSetup = typeof PreviewStreamHostSetup.Type;

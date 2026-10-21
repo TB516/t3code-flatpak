@@ -1,0 +1,744 @@
+diff --git a/apps/desktop/src/app/DesktopDatabaseMaintenance.test.ts b/apps/desktop/src/app/DesktopDatabaseMaintenance.test.ts
+new file mode 100644
+index 0000000000..dc19d91042
+--- /dev/null
++++ b/apps/desktop/src/app/DesktopDatabaseMaintenance.test.ts
+@@ -0,0 +1,195 @@
++import { assert, afterEach, it, vi } from "@effect/vitest";
++import * as Deferred from "effect/Deferred";
++import * as Effect from "effect/Effect";
++import * as Fiber from "effect/Fiber";
++import * as Layer from "effect/Layer";
++import * as Option from "effect/Option";
++import * as Sink from "effect/Sink";
++import * as Stream from "effect/Stream";
++import * as ChildProcess from "effect/process/ChildProcess";
++import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
++
++import * as DesktopDatabaseMaintenance from "./DesktopDatabaseMaintenance.ts";
++import * as DesktopEnvironment from "./DesktopEnvironment.ts";
++import * as DesktopState from "./DesktopState.ts";
++import * as DesktopBackendPool from "../backend/DesktopBackendPool.ts";
++import * as ElectronDialog from "../electron/ElectronDialog.ts";
++import * as ElectronWindow from "../electron/ElectronWindow.ts";
++
++const runtime = "/installed Flatpak/files/t3code";
++const baseDir = "/home/alice/.var/app/com.t3tools.t3code/data/t3";
++afterEach(() => vi.unstubAllEnvs());
++
++const harness = Effect.fn("test.databaseMaintenance.harness")(function* (
++  options: {
++    runtime?: string;
++    response?: number;
++    exitCode?: number;
++    ready?: boolean;
++    confirm?: Effect.Effect<void>;
++    stoppedPid?: number;
++  } = {},
++) {
++  vi.stubEnv("FLATPAK_ID", "com.t3tools.t3code");
++  vi.stubEnv("T3CODE_FLATPAK_RUNTIME", options.runtime ?? runtime);
++  const order: string[] = [];
++  const errors: string[] = [];
++  const commands: ChildProcess.Command[] = [];
++  let stopped = false;
++  const primary: DesktopBackendPool.DesktopBackendInstance = {
++    id: DesktopBackendPool.PRIMARY_INSTANCE_ID,
++    label: Effect.succeed("Local"),
++    currentConfig: Effect.succeedNone,
++    snapshot: Effect.sync(() => ({
++      desiredRunning: !stopped,
++      ready: !stopped,
++      activePid: stopped ? Option.fromNullishOr(options.stoppedPid) : Option.some(123),
++      restartAttempt: 0,
++      restartScheduled: false,
++    })),
++    stop: () =>
++      Effect.sync(() => {
++        order.push("stop");
++        stopped = true;
++      }),
++    start: Effect.sync(() => {
++      order.push("start");
++      stopped = false;
++    }),
++    waitForReady: () =>
++      Effect.sync(() => {
++        order.push("ready");
++        return options.ready ?? true;
++      }),
++  };
++  const dialog = ElectronDialog.ElectronDialog.of({
++    pickFolder: () => Effect.die("unexpected folder picker"),
++    pickFiles: () => Effect.die("unexpected file picker"),
++    showMessageBox: (input) =>
++      Effect.gen(function* () {
++        const confirm = input.type === "question";
++        order.push(confirm ? "confirm" : "success");
++        if (confirm && options.confirm) yield* options.confirm;
++        return { response: confirm ? (options.response ?? 1) : 0, checkboxChecked: false };
++      }),
++    showErrorBox: (_title, message) =>
++      Effect.sync(() => {
++        order.push("error");
++        errors.push(message);
++      }),
++  });
++  const spawner = ChildProcessSpawner.make((command) =>
++    Effect.sync(() => {
++      assert.isTrue(stopped, "cleanup must not start before the server stops");
++      order.push("compact");
++      commands.push(command);
++      const stdout = Stream.make(new TextEncoder().encode("Database: 2 GiB -> 1 GiB."));
++      const stderr = Stream.make(new TextEncoder().encode("Not enough disk space."));
++      return ChildProcessSpawner.makeHandle({
++        pid: ChildProcessSpawner.ProcessId(456),
++        stdout,
++        stderr,
++        all: stdout,
++        exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(options.exitCode ?? 0)),
++        isRunning: Effect.succeed(false),
++        kill: () => Effect.void,
++        stdin: Sink.drain,
++        getInputFd: () => Sink.drain,
++        getOutputFd: () => Stream.empty,
++        unref: Effect.succeed(Effect.void),
++      });
++    }),
++  );
++  const maintenance = yield* DesktopDatabaseMaintenance.make.pipe(
++    Effect.provide(
++      Layer.mergeAll(
++        DesktopBackendPool.layerTest([primary]),
++        DesktopState.layer,
++        Layer.succeed(DesktopEnvironment.DesktopEnvironment, {
++          platform: "linux",
++          baseDir,
++        } as DesktopEnvironment.DesktopEnvironment["Service"]),
++        Layer.succeed(ElectronDialog.ElectronDialog, dialog),
++        Layer.mock(ElectronWindow.ElectronWindow)({
++          currentMainOrFirst: Effect.succeedNone,
++        }),
++        Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner),
++      ),
++    ),
++  );
++  return { maintenance, order, errors, commands };
++});
++
++it.effect(
++  "stops the server, cleans only its own database, and restarts before reporting success",
++  () =>
++    Effect.gen(function* () {
++      const { maintenance, order, commands } = yield* harness();
++      yield* maintenance.compact;
++      assert.deepEqual(order, ["confirm", "stop", "compact", "start", "ready", "success"]);
++      const command = commands[0]!;
++      assert.equal(command._tag, "StandardCommand");
++      if (command._tag !== "StandardCommand") return;
++      assert.equal(command.command, "/usr/bin/flatpak-spawn");
++      assert.deepEqual(command.args.slice(-3), [
++        "/bin/sh",
++        `${runtime}/host-server.sh`,
++        "--compact-database",
++      ]);
++      assert.include(command.args, `--env=T3CODE_FLATPAK_SERVER=${runtime}/t3code`);
++      assert.include(command.args, `--env=T3CODE_HOME=${baseDir}`);
++    }),
++);
++
++it.effect("cancelling the confirmation leaves the server running", () =>
++  Effect.gen(function* () {
++    const { maintenance, order } = yield* harness({ response: 0 });
++    yield* maintenance.compact;
++    assert.deepEqual(order, ["confirm"]);
++  }),
++);
++
++it.effect("restarts after cleanup failure and reports the actual failure", () =>
++  Effect.gen(function* () {
++    const { maintenance, order, errors } = yield* harness({ exitCode: 1 });
++    yield* maintenance.compact;
++    assert.deepEqual(order, ["confirm", "stop", "compact", "start", "ready", "error"]);
++    assert.include(errors[0]!, "Not enough disk space.");
++    assert.include(errors[0]!, "The local server has restarted.");
++  }),
++);
++
++it.effect("does not run maintenance when the server has not exited", () =>
++  Effect.gen(function* () {
++    const { maintenance, order, commands } = yield* harness({ stoppedPid: 123 });
++    yield* maintenance.compact;
++    assert.deepEqual(order, ["confirm", "stop", "start", "ready", "error"]);
++    assert.equal(commands.length, 0);
++  }),
++);
++
++it.effect("ignores a second request while confirmation is open", () =>
++  Effect.gen(function* () {
++    const opened = yield* Deferred.make<void>();
++    const proceed = yield* Deferred.make<void>();
++    const { maintenance, order } = yield* harness({
++      confirm: Deferred.succeed(opened, undefined).pipe(Effect.andThen(Deferred.await(proceed))),
++    });
++    const first = yield* maintenance.compact.pipe(Effect.forkChild);
++    yield* Deferred.await(opened);
++    yield* maintenance.compact;
++    yield* Deferred.succeed(proceed, undefined);
++    yield* Fiber.join(first);
++    assert.equal(order.filter((entry) => entry === "compact").length, 1);
++    assert.equal(order.filter((entry) => entry === "confirm").length, 1);
++  }).pipe(Effect.scoped),
++);
++
++it.effect("does not expose cleanup without a Flatpak runtime", () =>
++  Effect.gen(function* () {
++    const { maintenance, order } = yield* harness({ runtime: "" });
++    assert.isFalse(maintenance.supported);
++    yield* maintenance.compact;
++    assert.deepEqual(order, []);
++  }),
++);
+diff --git a/apps/desktop/src/app/DesktopDatabaseMaintenance.ts b/apps/desktop/src/app/DesktopDatabaseMaintenance.ts
+new file mode 100644
+index 0000000000..c718d5a964
+--- /dev/null
++++ b/apps/desktop/src/app/DesktopDatabaseMaintenance.ts
+@@ -0,0 +1,173 @@
++import * as Cause from "effect/Cause";
++import * as Context from "effect/Context";
++import * as Duration from "effect/Duration";
++import * as Effect from "effect/Effect";
++import * as Exit from "effect/Exit";
++import * as Layer from "effect/Layer";
++import * as Option from "effect/Option";
++import * as Ref from "effect/Ref";
++import * as Schema from "effect/Schema";
++import * as Stream from "effect/Stream";
++import * as ChildProcess from "effect/process/ChildProcess";
++import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
++
++import * as DesktopEnvironment from "./DesktopEnvironment.ts";
++import * as DesktopState from "./DesktopState.ts";
++import { flatpakAppId } from "./Flatpak.ts";
++import * as DesktopBackendPool from "../backend/DesktopBackendPool.ts";
++import * as ElectronDialog from "../electron/ElectronDialog.ts";
++import * as ElectronWindow from "../electron/ElectronWindow.ts";
++
++class DesktopDatabaseCleanupError extends Schema.TaggedError<DesktopDatabaseCleanupError>()(
++  "DesktopDatabaseCleanupError",
++  { message: Schema.String },
++) {}
++
++/** Coordinates offline cleanup of the Flatpak desktop's own database. */
++export class DesktopDatabaseMaintenance extends Context.Service<
++  DesktopDatabaseMaintenance,
++  {
++    readonly supported: boolean;
++    readonly compact: Effect.Effect<void>;
++  }
++>()("@t3tools/desktop/app/DesktopDatabaseMaintenance") {}
++
++/** @public Service construction is part of the canonical Effect module API. */
++export const make = Effect.gen(function* () {
++  const environment = yield* DesktopEnvironment.DesktopEnvironment;
++  const pool = yield* DesktopBackendPool.DesktopBackendPool;
++  const dialog = yield* ElectronDialog.ElectronDialog;
++  const windows = yield* ElectronWindow.ElectronWindow;
++  const state = yield* DesktopState.DesktopState;
++  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
++  const busy = yield* Ref.make(false);
++  const runtime = process.env.T3CODE_FLATPAK_RUNTIME;
++  const supported =
++    flatpakAppId(process.env, environment.platform) !== null && runtime?.startsWith("/") === true;
++
++  const compact = Effect.gen(function* () {
++    if (!supported || !runtime || (yield* Ref.get(state.quitting))) return;
++    if (yield* Ref.getAndSet(busy, true)) return;
++    yield* Effect.gen(function* () {
++      const owner = Option.getOrUndefined(yield* windows.currentMainOrFirst);
++      const confirmation = yield* dialog.showMessageBox(
++        {
++          type: "question",
++          title: "Reclaim database space",
++          message: "Reclaim space and restart the local server?",
++          detail:
++            "Finish active work first. T3 Code will temporarily disconnect while its local server stops and database cleanup runs. This can take several minutes and needs temporary disk space. The old rollback database will be kept.",
++          buttons: ["Cancel", "Reclaim space and restart"],
++          defaultId: 0,
++          cancelId: 0,
++          noLink: true,
++        },
++        owner,
++      );
++      if (confirmation.response !== 1 || (yield* Ref.get(state.quitting))) return;
++      const primary = yield* pool.primary;
++      const snapshot = yield* primary.snapshot;
++      if (!snapshot.ready) {
++        yield* dialog.showErrorBox(
++          "Database cleanup unavailable",
++          "Wait for the local server to finish starting, then try again.",
++        );
++        return;
++      }
++
++      // Run the installed package directly on the host, with no CLI launcher or service install.
++      const result = yield* Effect.gen(function* () {
++        yield* primary.stop();
++        const stopped = yield* primary.snapshot;
++        if (Option.isSome(stopped.activePid)) {
++          return yield* Effect.fail(
++            new DesktopDatabaseCleanupError({
++              message: "The local server did not stop. Database cleanup was not started.",
++            }),
++          );
++        }
++        return yield* Effect.scoped(
++          Effect.gen(function* () {
++            const child = yield* spawner.spawn(
++              ChildProcess.make(
++                "/usr/bin/flatpak-spawn",
++                [
++                  "--host",
++                  "--watch-bus",
++                  `--directory=${runtime}`,
++                  `--env=T3CODE_HOME=${environment.baseDir}`,
++                  `--env=T3CODE_FLATPAK_SERVER=${runtime}/t3code`,
++                  `--env=T3CODE_FLATPAK_ENTRY=${runtime}/resources/app.asar/apps/server/dist/bin.mjs`,
++                  `--env=T3CODE_FLATPAK_COMPILE_CACHE=${runtime}/resources/app.asar/apps/desktop/dist-electron/compileCache.cjs`,
++                  "/bin/sh",
++                  `${runtime}/host-server.sh`,
++                  "--compact-database",
++                ],
++                { stdin: "ignore" },
++              ),
++            );
++            const [output, errors, code] = yield* Effect.all(
++              [
++                child.stdout.pipe(Stream.decodeText(), Stream.mkString),
++                child.stderr.pipe(Stream.decodeText(), Stream.mkString),
++                child.exitCode,
++              ],
++              { concurrency: "unbounded" },
++            );
++            if (code !== 0) {
++              return yield* Effect.fail(
++                new DesktopDatabaseCleanupError({
++                  message: errors.trim() || output.trim() || "Database cleanup failed.",
++                }),
++              );
++            }
++            return output.trim();
++          }),
++        );
++      }).pipe(
++        Effect.ensuring(
++          Effect.gen(function* () {
++            if (!(yield* Ref.get(state.quitting))) yield* primary.start;
++          }),
++        ),
++        Effect.exit,
++      );
++      if (yield* Ref.get(state.quitting)) return;
++      const ready = yield* primary.waitForReady(Duration.seconds(60));
++      if (Exit.isFailure(result)) {
++        const error = Cause.squash(result.cause);
++        yield* dialog.showErrorBox(
++          "Database cleanup failed",
++          `${error instanceof Error ? error.message : String(error)}\n\n${ready ? "The local server has restarted." : "The local server has not become ready. Close and reopen T3 Code to retry starting it."}`,
++        );
++        return;
++      }
++      yield* dialog.showMessageBox(
++        {
++          type: ready ? "info" : "warning",
++          title: "Database cleanup complete",
++          message: ready
++            ? "Database space reclaimed. The local server has restarted."
++            : "Database space reclaimed, but the local server has not become ready.",
++          detail:
++            result.value +
++            (ready ? "" : "\nClose and reopen T3 Code to retry starting the server."),
++          buttons: ["OK"],
++        },
++        owner,
++      );
++    }).pipe(Effect.ensuring(Ref.set(busy, false)));
++  }).pipe(
++    Effect.catchCause((cause) => {
++      const error = Cause.squash(cause);
++      return dialog.showErrorBox(
++        "Database cleanup failed",
++        error instanceof Error ? error.message : String(error),
++      );
++    }),
++    Effect.withSpan("desktop.databaseMaintenance.compact"),
++  );
++  return DesktopDatabaseMaintenance.of({ supported, compact });
++});
++
++export const layer = Layer.effect(DesktopDatabaseMaintenance, make);
+diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
+index 2d67aa56e6..cc799ba42c 100644
+--- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
++++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
+@@ -84,6 +84,8 @@ import {
+   uninstallCliCommand,
+ } from "./methods/cliCommand.ts";
+ 
++import { getDatabaseMaintenanceSupported, compactDatabase } from "./methods/databaseMaintenance.ts";
++
+ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
+   const ipc = yield* DesktopIpc.DesktopIpc;
+   yield* installNotificationBadge();
+@@ -93,6 +95,8 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+   yield* ipc.handle(AppActivationIpc.complete);
+   yield* ipc.handle(WebLinksIpc.setReady);
+ 
++  yield* ipc.handleSync(getDatabaseMaintenanceSupported);
++  yield* ipc.handle(compactDatabase);
+   yield* ipc.handleSync(takeLegacyLocalStorage);
+   yield* ipc.handle(completeLegacyLocalStorage);
+   yield* ipc.handleSync(getAppBranding);
+diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
+index 9b11a2283a..5d5a604538 100644
+--- a/apps/desktop/src/ipc/channels.ts
++++ b/apps/desktop/src/ipc/channels.ts
+@@ -125,3 +125,6 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
+ export const CANCEL_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:cancel-provider-auth-callback";
+ export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-storage";
+ export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
++
++export const DATABASE_MAINTENANCE_SUPPORTED_CHANNEL = "desktop:database-maintenance-supported";
++export const DATABASE_MAINTENANCE_COMPACT_CHANNEL = "desktop:database-maintenance-compact";
+diff --git a/apps/desktop/src/ipc/methods/databaseMaintenance.ts b/apps/desktop/src/ipc/methods/databaseMaintenance.ts
+new file mode 100644
+index 0000000000..2bb55574f9
+--- /dev/null
++++ b/apps/desktop/src/ipc/methods/databaseMaintenance.ts
+@@ -0,0 +1,23 @@
++import * as Effect from "effect/Effect";
++import * as Schema from "effect/Schema";
++
++import * as DesktopDatabaseMaintenance from "../../app/DesktopDatabaseMaintenance.ts";
++import * as IpcChannels from "../channels.ts";
++import { makeIpcMethod, makeSyncIpcMethod } from "../DesktopIpc.ts";
++
++export const getDatabaseMaintenanceSupported = makeSyncIpcMethod({
++  channel: IpcChannels.DATABASE_MAINTENANCE_SUPPORTED_CHANNEL,
++  result: Schema.Boolean,
++  handler: Effect.fn("desktop.ipc.databaseMaintenance.supported")(function* () {
++    return (yield* DesktopDatabaseMaintenance.DesktopDatabaseMaintenance).supported;
++  }),
++});
++
++export const compactDatabase = makeIpcMethod({
++  channel: IpcChannels.DATABASE_MAINTENANCE_COMPACT_CHANNEL,
++  payload: Schema.Void,
++  result: Schema.Void,
++  handler: Effect.fn("desktop.ipc.databaseMaintenance.compact")(function* () {
++    yield* (yield* DesktopDatabaseMaintenance.DesktopDatabaseMaintenance).compact;
++  }),
++});
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 3056ce1ea2..755abd68b2 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -40,6 +40,7 @@ import * as DesktopAppIdentity from "./app/DesktopAppIdentity.ts";
+ import * as DesktopConnectionCatalogStore from "./app/DesktopConnectionCatalogStore.ts";
+ import * as DesktopClerk from "./app/DesktopClerk.ts";
+ import * as DesktopCliCommand from "./app/DesktopCliCommand.ts";
++import * as DesktopDatabaseMaintenance from "./app/DesktopDatabaseMaintenance.ts";
+ import * as DesktopApplicationMenu from "./window/DesktopApplicationMenu.ts";
+ import * as DesktopAssets from "./app/DesktopAssets.ts";
+ import * as DesktopBackendConfiguration from "./backend/DesktopBackendConfiguration.ts";
+@@ -209,6 +210,7 @@ const layerDesktopApplication = Layer.mergeAll(
+   DesktopApplicationMenu.layer,
+   DesktopLinuxUrlHandler.layer,
+   DesktopCliCommand.layer,
++  DesktopDatabaseMaintenance.layer,
+   layerDesktopSsh,
+ ).pipe(
+   Layer.provideMerge(layerDesktopSnapShot),
+diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
+index bffa02d9ca..7c25290483 100644
+--- a/apps/desktop/src/preload.ts
++++ b/apps/desktop/src/preload.ts
+@@ -271,6 +271,13 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+   checkForUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_CHECK_CHANNEL),
+   downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
+   installUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL),
++  ...(ipcRenderer.sendSync(IpcChannels.DATABASE_MAINTENANCE_SUPPORTED_CHANNEL) === true
++    ? {
++        databaseMaintenance: {
++          compact: () => ipcRenderer.invoke(IpcChannels.DATABASE_MAINTENANCE_COMPACT_CHANNEL),
++        },
++      }
++    : {}),
+   cliCommand: {
+     getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
+     install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
+diff --git a/apps/server/src/binCli.ts b/apps/server/src/binCli.ts
+index b0a2ceffef..78198fdc50 100644
+--- a/apps/server/src/binCli.ts
++++ b/apps/server/src/binCli.ts
+@@ -1,4 +1,4 @@
+-import { doctorCommand } from "./cli/doctor.ts";
++import { doctorCommand, flatpakCompactDatabaseCommand } from "./cli/doctor.ts";
+ import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
+ import * as NodeServices from "@effect/platform-node/NodeServices";
+ import * as Effect from "effect/Effect";
+@@ -87,6 +87,7 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
+       themeCommand,
+       traceCommand,
+       doctorCommand,
++      flatpakCompactDatabaseCommand,
+       triageCommand,
+       cloudEnabled ? connectCommand : connectUnavailableCommand,
+     ]),
+diff --git a/apps/server/src/cli/doctor.test.ts b/apps/server/src/cli/doctor.test.ts
+index 5743763254..fd7e06c9c4 100644
+--- a/apps/server/src/cli/doctor.test.ts
++++ b/apps/server/src/cli/doctor.test.ts
+@@ -1,10 +1,21 @@
+ import * as NodeServices from "@effect/platform-node/NodeServices";
+ import { assert, it } from "@effect/vitest";
+ import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Path from "effect/Path";
++import * as SqlClient from "effect/sql/SqlClient";
++import { Command } from "effect/cli";
++import * as HostProcess from "@t3tools/shared/HostProcess";
++import * as NetService from "@t3tools/shared/Net";
++import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
++import * as EventStore from "../orchestration-v2/EventStore.ts";
++import * as ProjectionMaintenance from "../orchestration-v2/ProjectionMaintenance.ts";
++import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
++import * as Sqlite from "../persistence/Sqlite.ts";
+ import * as Layer from "effect/Layer";
+ 
+ import * as BootService from "../cloud/bootService.ts";
+-import { runDoctor } from "./doctor.ts";
++import { runDoctor, flatpakCompactDatabaseCommand } from "./doctor.ts";
+ import { DatabaseMaintenance } from "../persistence/DatabaseMaintenance.ts";
+ 
+ it.effect(
+@@ -55,3 +66,42 @@ it.effect(
+       assert.deepEqual(calls, ["pause", "compact", "resume"]);
+     }),
+ );
++
++it.effect(
++  "the Flatpak desktop command compacts its database without a service and keeps the rollback database",
++  () =>
++    Effect.gen(function* () {
++      const fs = yield* FileSystem.FileSystem;
++      const path = yield* Path.Path;
++      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-flatpak-compact-" });
++      const dbPath = path.join(baseDir, "userdata", "statev2.sqlite");
++      const legacy = path.join(baseDir, "userdata", "state.sqlite");
++      yield* Effect.flatMap(
++        ProjectionMaintenance.ProjectionMaintenanceV2,
++        (projections) => projections.rebuild,
++      ).pipe(
++        Effect.provide(
++          ProjectionMaintenance.layer.pipe(
++            Layer.provide(Layer.merge(EventStore.layer, ProjectionStore.layer)),
++            Layer.provideMerge(Sqlite.layerFromPath(dbPath)),
++          ),
++        ),
++      );
++      yield* fs.writeFileString(legacy, "retained rollback database");
++      yield* Command.runWith(flatpakCompactDatabaseCommand, { version: "0.0.0" })([
++        "--base-dir",
++        baseDir,
++      ]).pipe(
++        Effect.provide(NetService.layer),
++        Effect.provideService(HostProcess.Environment, {
++          T3CODE_FLATPAK_SERVER: "/installed/flatpak/t3code",
++        }),
++      );
++      assert.equal(yield* fs.readFileString(legacy), "retained rollback database");
++      const mode = yield* Effect.flatMap(
++        SqlClient.SqlClient,
++        (sql) => sql<{ auto_vacuum: number }>`PRAGMA auto_vacuum`,
++      ).pipe(Effect.provide(NodeSqliteClient.layer({ filename: dbPath, readonly: true })));
++      assert.equal(mode[0]?.auto_vacuum, 2);
++    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
++);
+diff --git a/apps/server/src/cli/doctor.ts b/apps/server/src/cli/doctor.ts
+index 850e67daf5..92b639c0d8 100644
+--- a/apps/server/src/cli/doctor.ts
++++ b/apps/server/src/cli/doctor.ts
+@@ -1,8 +1,10 @@
++import * as HostProcess from "@t3tools/shared/HostProcess";
+ import { DATABASE_COMPACTION_RECOMMENDED_BYTES } from "@t3tools/contracts";
+ import * as Console from "effect/Console";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+ import { Command, Flag, GlobalFlag, Prompt } from "effect/cli";
++import * as CliError from "effect/cli/CliError";
+ 
+ import * as BootService from "../cloud/bootService.ts";
+ import * as DatabaseMaintenance from "../persistence/DatabaseMaintenance.ts";
+@@ -148,3 +150,29 @@ export const doctorCommand = Command.make("doctor", {
+     }),
+   ),
+ );
++
++/** Internal Flatpak desktop action. Never reconciles services or removes the rollback database. */
++export const flatpakCompactDatabaseCommand = Command.make("flatpak-compact-database", {
++  ...projectLocationFlags,
++}).pipe(
++  Command.unlisted,
++  Command.withHandler((flags) =>
++    Effect.gen(function* () {
++      if (!(yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER) {
++        return yield* Effect.fail(
++          new CliError.UserError({
++            cause: "This action is only available to the Flatpak desktop.",
++          }),
++        );
++      }
++      const config = yield* resolveCliAuthConfig(flags, yield* GlobalFlag.LogLevel);
++      const result = yield* Effect.gen(function* () {
++        const maintenance = yield* DatabaseMaintenance.DatabaseMaintenance;
++        return yield* maintenance.compact(config.dbPath);
++      }).pipe(Effect.provide(DatabaseMaintenance.layer));
++      yield* Console.log(
++        `Database: ${formatBytes(result.beforeBytes)} -> ${formatBytes(result.afterBytes)}. ${result.deletedEventCount} superseded events removed.`,
++      );
++    }),
++  ),
++);
+diff --git a/apps/web/src/components/settings/DatabaseStorageNotice.tsx b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
+index 637c920f5e..00f726a89f 100644
+--- a/apps/web/src/components/settings/DatabaseStorageNotice.tsx
++++ b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
+@@ -1,15 +1,18 @@
+ import { useAtomValue } from "@effect/atom-react";
+ import { shouldRecommendDatabaseCompaction, type EnvironmentId } from "@t3tools/contracts";
+ import * as Schema from "effect/Schema";
++import { useState } from "react";
+ 
+ import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+ import { useLocalStorage } from "../../hooks/useLocalStorage";
++import { usePrimaryEnvironmentId } from "../../state/environments";
+ import { serverEnvironment } from "../../state/server";
++import { stackedThreadToast, toastManager } from "../ui/toast";
+ import { Button } from "../ui/button";
+ import { SettingsGroup } from "./SettingsGroup";
+ import { SettingsRow, SettingsSection } from "./settingsLayout";
+ 
+-/** Suggests `t3 doctor` for a database that still holds at least 1 GiB of freed pages. */
++/** Offers database maintenance when offline compaction is recommended. */
+ export function DatabaseStorageNotice({
+   environmentId,
+   label,
+@@ -24,30 +27,77 @@ export function DatabaseStorageNotice({
+     Schema.Boolean,
+   );
+   const { copyToClipboard } = useCopyToClipboard({ target: "command" });
++  const primaryEnvironmentId = usePrimaryEnvironmentId();
++  const maintenance =
++    environmentId === primaryEnvironmentId ? window.desktopBridge?.databaseMaintenance : undefined;
++  const [pending, setPending] = useState(false);
++  const compact = async () => {
++    if (!maintenance || pending) return;
++    setPending(true);
++    try {
++      await maintenance.compact();
++    } catch (error) {
++      toastManager.add(
++        stackedThreadToast({
++          type: "error",
++          title: "Could not start database cleanup",
++          description:
++            error instanceof Error ? error.message : "Try again after the local server reconnects.",
++        }),
++      );
++    } finally {
++      setPending(false);
++    }
++  };
+   const status = result._tag === "Success" ? result.value : null;
+   if (dismissed || status === null || !shouldRecommendDatabaseCompaction(status)) return null;
+   return (
+     <SettingsSection id={`storage-database-${environmentId}`} title="Database">
+       <SettingsGroup>
+         <SettingsRow
+-          title={`Reclaim ${(status.reclaimableBytes / 1024 ** 3).toFixed(1)} GiB on ${label}`}
++          title={
++            maintenance
++              ? `Database storage on ${label}`
++              : `Reclaim ${(status.reclaimableBytes / 1024 ** 3).toFixed(1)} GiB on ${label}`
++          }
+           description={
+-            <>
+-              Old history is cleaned up automatically, but this database still holds the freed
+-              space. Run the command on {label} to return it to disk; it pauses and restarts the
+-              background service. Quit the desktop app first if it hosts this environment.
+-              <code className="mt-2 block select-text break-all">{status.compactCommand}</code>
+-            </>
++            maintenance ? (
++              <>
++                The database uses {(status.databaseBytes / 1024 ** 2).toFixed(1)} MiB, with{" "}
++                {(status.reclaimableBytes / 1024 ** 2).toFixed(1)} MiB available to reclaim.
++                Reclaiming space temporarily stops the local server. Finish active work first;
++                cleanup can take several minutes and needs temporary disk space. The server restarts
++                afterward.
++              </>
++            ) : (
++              <>
++                Old history is cleaned up automatically, but this database still holds the freed
++                space. Run the command on {label} to return it to disk; it pauses and restarts the
++                background service. Quit the desktop app first if it hosts this environment.
++                <code className="mt-2 block select-text break-all">{status.compactCommand}</code>
++              </>
++            )
+           }
+           control={
+             <div className="flex flex-wrap items-center gap-1.5">
+-              <Button
+-                variant="outline"
+-                size="sm"
+-                onClick={() => copyToClipboard(status.compactCommand, undefined)}
+-              >
+-                Copy command
+-              </Button>
++              {maintenance ? (
++                <Button
++                  variant="outline"
++                  size="sm"
++                  disabled={pending}
++                  onClick={() => void compact()}
++                >
++                  {pending ? "Reclaiming space…" : "Reclaim space and restart"}
++                </Button>
++              ) : (
++                <Button
++                  variant="outline"
++                  size="sm"
++                  onClick={() => copyToClipboard(status.compactCommand, undefined)}
++                >
++                  Copy command
++                </Button>
++              )}
+               <Button variant="ghost" size="sm" onClick={() => setDismissed(true)}>
+                 Dismiss
+               </Button>
+diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
+index d1f6b34939..02012f6d9b 100644
+--- a/packages/contracts/src/ipc.ts
++++ b/packages/contracts/src/ipc.ts
+@@ -1135,6 +1135,10 @@ export interface DesktopBridge {
+   downloadUpdate: () => Promise<DesktopUpdateActionResult>;
+   installUpdate: () => Promise<DesktopUpdateActionResult>;
+   onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
++  /** Offline cleanup of this Flatpak desktop's local database, with confirmation and restart. */
++  databaseMaintenance?: {
++    compact: () => Promise<void>;
++  };
+   cliCommand?: {
+     getState: () => Promise<DesktopCliCommandState>;
+     install: () => Promise<DesktopCliCommandState>;

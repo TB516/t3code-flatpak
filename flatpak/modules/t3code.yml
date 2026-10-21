@@ -52,6 +52,8 @@ test-commands:
     src/environment/ServerEnvironment.test.ts
     src/preview/PreviewBrowserHost.test.ts
     src/preview/ServerBrowserStream.test.ts
+    src/cli/doctor.test.ts
+    src/persistence/DatabaseMaintenance.test.ts
   - pnpm --filter t3 typecheck
 sources:
   - type: git
@@ -77,6 +79,9 @@ sources:
       - ../../patches/0008-flatpak-cli-launcher.patch
       - ../../patches/0009-flatpak-server-updates.patch
       - ../../patches/0010-flatpak-browser-requirements.patch
+      - ../../patches/0011-flatpak-database-maintenance.patch
+      - ../../patches/0012-flatpak-update-channel.patch
+      - ../../patches/0013-electron-security-update.patch
     use-git: true
   - type: dir
     path: ../package
