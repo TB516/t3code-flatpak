@@ -1,0 +1,68 @@
+diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
+index 9a069527d2..919619b47a 100644
+--- a/apps/desktop/src/updates/DesktopUpdates.test.ts
++++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
+@@ -37,6 +37,11 @@ describe("DesktopUpdates", () => {
+       const result = yield* updates.check("manual");
+       assert.isFalse(result.checked);
+       assert.equal(harness.checkCount(), 0);
++      const settings = yield* DesktopAppSettings.DesktopAppSettings;
++      const before = yield* settings.get;
++      const nextChannel = state.channel === "latest" ? "nightly" : "latest";
++      assert.deepEqual(yield* updates.setChannel(nextChannel), state);
++      assert.deepEqual(yield* settings.get, before);
+     }).pipe(
+       Effect.scoped,
+       Effect.provide(harness.layer),
+diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
+index 0c65574646..94737ae8f2 100644
+--- a/apps/desktop/src/updates/DesktopUpdates.ts
++++ b/apps/desktop/src/updates/DesktopUpdates.ts
+@@ -1109,6 +1109,9 @@ export const make = Effect.gen(function* () {
+       nextChannel: DesktopUpdateChannel,
+     ) {
+       yield* Effect.annotateCurrentSpan({ channel: nextChannel });
++      if (flatpakAppId(process.env, environment.platform) !== null) {
++        return yield* Ref.get(updateStateRef);
++      }
+       const activeAction = yield* tryStartChannelChange;
+       if (Option.isSome(activeAction)) {
+         return yield* new DesktopUpdateActionInProgressError({
+diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
+index 16c6ff3fb8..ed66cdcb3b 100644
+--- a/apps/web/src/components/settings/SettingsPanels.tsx
++++ b/apps/web/src/components/settings/SettingsPanels.tsx
+@@ -295,6 +295,7 @@ function AboutVersionSection() {
+     if (
+       !bridge ||
+       typeof bridge.setUpdateChannel !== "function" ||
++      updateState?.enabled !== true ||
+       channel === selectedUpdateChannel
+     ) {
+       return;
+@@ -449,10 +450,15 @@ function AboutVersionSection() {
+       {hasDesktopBridge ? (
+         <SettingsRow
+           {...searchableSetting("update-track")}
+-          description="Use stable releases or nightly builds. Switch back anytime."
++          description={
++            updateState?.enabled === false
++              ? (updateState.message ?? "Updates are unavailable.")
++              : "Use stable releases or nightly builds. Switch back anytime."
++          }
+           control={
+             <Select
+               value={selectedUpdateChannel}
++              disabled={isChangingUpdateChannel || updateState?.enabled !== true}
+               onValueChange={(value) => {
+                 handleUpdateChannelChange(value as DesktopUpdateChannel);
+               }}
+@@ -461,7 +467,7 @@ function AboutVersionSection() {
+                 size="sm"
+                 className="w-full sm:w-40"
+                 aria-label="Update track"
+-                disabled={isChangingUpdateChannel}
++                disabled={isChangingUpdateChannel || updateState?.enabled !== true}
+               >
+                 <SelectValue>
+                   {selectedUpdateChannel === "nightly" ? "Nightly" : "Stable"}

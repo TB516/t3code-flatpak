@@ -52,12 +52,14 @@ test-commands:
     src/environment/ServerEnvironment.test.ts
     src/preview/PreviewBrowserHost.test.ts
     src/preview/ServerBrowserStream.test.ts
+    src/cli/doctor.test.ts
+    src/persistence/DatabaseMaintenance.test.ts
   - pnpm --filter t3 typecheck
 sources:
   - type: git
     url: https://github.com/pingdotgg/t3code.git
-    tag: v0.1.0
-    commit: 81493efb71e8e8244f95d3e9f71d8369654ab151
+    tag: v0.1.1
+    commit: fe27e8e3dc12dcbb108e9a28fd9b8cb65f34ae92
     x-checker-data:
       type: json
       url: https://api.github.com/repos/pingdotgg/t3code/releases/latest
@@ -77,6 +79,9 @@ sources:
       - ../../patches/0008-flatpak-cli-launcher.patch
       - ../../patches/0009-flatpak-server-updates.patch
       - ../../patches/0010-flatpak-browser-requirements.patch
+      - ../../patches/0011-flatpak-database-maintenance.patch
+      - ../../patches/0012-flatpak-update-channel.patch
+      - ../../patches/0013-electron-security-update.patch
     use-git: true
   - type: dir
     path: ../package

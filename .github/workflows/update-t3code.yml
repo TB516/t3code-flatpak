@@ -52,6 +52,8 @@ jobs:
           branch: automation/update-t3code-${{ steps.release.outputs.result }}
           delete-branch: true
           draft: true
+          # Bot-created PRs don't notify anyone unless a person is requested.
+          reviewers: TB516
           commit-message: "chore(flatpak): update T3 Code to ${{ steps.release.outputs.result }}"
           title: Update T3 Code to ${{ steps.release.outputs.result }}
           body: |

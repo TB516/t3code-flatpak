@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
-index b306975be..7f70a3cfc 100644
+index dadbe8acc..79e41c7b6 100644
 --- a/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 +++ b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 @@ -1,5 +1,8 @@
@@ -11,7 +11,7 @@ index b306975be..7f70a3cfc 100644
  import { parsePersistedServerObservabilitySettings } from "@t3tools/shared/serverSettings";
  import { currentDesktopBootstrapToken } from "@t3tools/shared/desktopBootstrapToken";
  import * as Clock from "effect/Clock";
-@@ -584,7 +587,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
+@@ -535,7 +538,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
        ...buildObservabilityFragment(input.observabilitySettings),
      };
  
@@ -20,7 +20,7 @@ index b306975be..7f70a3cfc 100644
        executablePath: process.execPath,
        // Packaged builds only, so a dev instance never shares the cache with the
        // prod app it is often run from. `--require` rather than NODE_COMPILE_CACHE,
-@@ -612,6 +615,15 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
+@@ -561,6 +564,15 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
        captureOutput: true,
        preflightFailure: Option.none(),
      } satisfies DesktopBackendManager.DesktopBackendStartConfig;

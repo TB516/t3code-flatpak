@@ -1,8 +1,8 @@
 diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
-index cb47e40b8..2d54e1ae7 100644
+index d2cff4726..1de29fedc 100644
 --- a/scripts/build-desktop-artifact.ts
 +++ b/scripts/build-desktop-artifact.ts
-@@ -3845,9 +3845,16 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
+@@ -4114,10 +4114,17 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
    for (const entry of stageEntries) {
      const from = path.join(stageDistDir, entry);
      const stat = yield* fs.stat(from).pipe(Effect.orElseSucceed(() => null));
@@ -21,3 +21,4 @@ index cb47e40b8..2d54e1ae7 100644
 +    }
      copiedArtifacts.push(to);
    }
+ 
