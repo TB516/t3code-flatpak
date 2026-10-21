@@ -56,8 +56,8 @@ test-commands:
 sources:
   - type: git
     url: https://github.com/pingdotgg/t3code.git
-    tag: v0.1.0
-    commit: 81493efb71e8e8244f95d3e9f71d8369654ab151
+    tag: v0.1.1
+    commit: fe27e8e3dc12dcbb108e9a28fd9b8cb65f34ae92
     x-checker-data:
       type: json
       url: https://api.github.com/repos/pingdotgg/t3code/releases/latest
