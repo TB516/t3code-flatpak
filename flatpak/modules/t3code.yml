@@ -44,7 +44,7 @@ test-commands:
     env -u FLATPAK_ID
     pnpm --filter @t3tools/desktop exec vp test run
     --exclude src/wsl/DesktopWslEnvironment.test.ts
-  - pnpm --filter @t3tools/desktop typecheck
+  - pnpm --filter @t3tools/desktop exec vp run typecheck
   - >-
     pnpm --filter t3 exec vp test run
     src/process/externalLauncher.test.ts
@@ -81,7 +81,6 @@ sources:
       - ../../patches/0010-flatpak-browser-requirements.patch
       - ../../patches/0011-flatpak-database-maintenance.patch
       - ../../patches/0012-flatpak-update-channel.patch
-      - ../../patches/0013-electron-security-update.patch
     use-git: true
   - type: dir
     path: ../package

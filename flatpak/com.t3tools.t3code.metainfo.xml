@@ -21,7 +21,11 @@
   <releases>
     <release version="0.1.2" date="2026-10-22">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.2</url>
-      <description></description>
+      <description>
+        <p>Update to T3 Code 0.1.2, which ships Electron 44.9.3 upstream.</p>
+        <p>Settings now offers to reclaim the local database's space until automatic
+        shrinking is on, and can delete the database kept from before 0.1.0.</p>
+      </description>
     </release>
     <release version="0.1.1-1" date="2026-10-21">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.1</url>

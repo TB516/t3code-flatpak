@@ -1,8 +1,17 @@
 diff --git a/apps/server/src/preview/PreviewBrowserHost.test.ts b/apps/server/src/preview/PreviewBrowserHost.test.ts
-index 8c6b8b478..99ef56632 100644
+index b0b52a9362..cf1f0ed6f5 100644
 --- a/apps/server/src/preview/PreviewBrowserHost.test.ts
 +++ b/apps/server/src/preview/PreviewBrowserHost.test.ts
-@@ -75,6 +75,21 @@ const diagnose = (input: {
+@@ -17,6 +17,8 @@ const LDD_IN_BARE_DEBIAN = `\tlinux-vdso.so.1 (0x00007ffd2d1f8000)
+ `;
+ 
+ // Chrome's own abort on Ubuntu 26.04 with unprivileged user namespaces restricted.
++const SANDBOX_ABORT =
++  "[1005/163106.285700:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:129] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/";
+ 
+ // What the real loader prints when the browser's `--version` cannot start it.
+ const LOADER_ERROR =
+@@ -73,6 +75,21 @@ const diagnose = (input: {
  };
  
  describe("diagnoseLaunchFailure", () => {
@@ -21,11 +30,11 @@ index 8c6b8b478..99ef56632 100644
 +    }),
 +  );
 +
-   it.effect("turns Chrome's sandbox abort into the AppArmor steps", () =>
+   it.effect("names every library the loader cannot find", () =>
      Effect.gen(function* () {
-       const { error, commands } = yield* diagnose({
+       const { error } = yield* diagnose({
 diff --git a/apps/server/src/preview/PreviewBrowserHost.ts b/apps/server/src/preview/PreviewBrowserHost.ts
-index 179ba9a1d..5fe4890e7 100644
+index 179ba9a1d2..5fe4890e7b 100644
 --- a/apps/server/src/preview/PreviewBrowserHost.ts
 +++ b/apps/server/src/preview/PreviewBrowserHost.ts
 @@ -57,18 +57,24 @@ export const DEBIAN_PACKAGES: ReadonlyArray<ReadonlyArray<string>> = [
@@ -67,7 +76,7 @@ index 179ba9a1d..5fe4890e7 100644
        // Playwright reports Chrome's refusal to sandbox as root as a sandbox failure too.
        return (yield* HostProcess.UserId) === 0
 diff --git a/apps/server/src/preview/ServerBrowser.ts b/apps/server/src/preview/ServerBrowser.ts
-index 5b386e5f0..891c19884 100644
+index 5b386e5f07..891c19884d 100644
 --- a/apps/server/src/preview/ServerBrowser.ts
 +++ b/apps/server/src/preview/ServerBrowser.ts
 @@ -2457,7 +2457,9 @@ const make = Effect.gen(function* () {
@@ -82,7 +91,7 @@ index 5b386e5f0..891c19884 100644
    }
  
 diff --git a/apps/server/src/preview/ServerBrowserStream.test.ts b/apps/server/src/preview/ServerBrowserStream.test.ts
-index 6b2d24802..7e98804be 100644
+index 6b2d24802d..7e98804be3 100644
 --- a/apps/server/src/preview/ServerBrowserStream.test.ts
 +++ b/apps/server/src/preview/ServerBrowserStream.test.ts
 @@ -377,6 +377,17 @@ it.effect("passes uploaded files to the page's open picker and needs operate sco
@@ -122,7 +131,7 @@ index 6b2d24802..7e98804be 100644
    }).pipe(Effect.scoped),
  );
 diff --git a/apps/server/src/preview/ServerBrowserStream.ts b/apps/server/src/preview/ServerBrowserStream.ts
-index ad42eaf5d..02f9dc27b 100644
+index ad42eaf5d7..02f9dc27b2 100644
 --- a/apps/server/src/preview/ServerBrowserStream.ts
 +++ b/apps/server/src/preview/ServerBrowserStream.ts
 @@ -212,9 +212,9 @@ const makeHandler = Effect.fnUntraced(function* (browser: ServerBrowser.ServerBr
@@ -138,10 +147,10 @@ index ad42eaf5d..02f9dc27b 100644
  const isSandboxError = Schema.is(PreviewBrowserHost.PreviewBrowserSandboxError);
  const isLibrariesError = Schema.is(PreviewBrowserHost.PreviewBrowserLibrariesError);
 diff --git a/apps/web/src/browser/ServerBrowserSurface.tsx b/apps/web/src/browser/ServerBrowserSurface.tsx
-index 27ae15e5e..5081b85b3 100644
+index c0de4f0d32..6769c49a03 100644
 --- a/apps/web/src/browser/ServerBrowserSurface.tsx
 +++ b/apps/web/src/browser/ServerBrowserSurface.tsx
-@@ -872,7 +872,9 @@ export function ServerBrowserSurface(props: {
+@@ -870,7 +870,9 @@ export function ServerBrowserSurface(props: {
            <p role="alert" className="max-w-sm text-sm text-muted-foreground">
              {previewStreamHostSetupMessage(hostSetup)}
            </p>
@@ -153,7 +162,7 @@ index 27ae15e5e..5081b85b3 100644
              Try again
            </Button>
 diff --git a/packages/client-runtime/src/preview/serverBrowserStream.ts b/packages/client-runtime/src/preview/serverBrowserStream.ts
-index b71fff335..9d5ab790a 100644
+index b71fff335f..9d5ab790a2 100644
 --- a/packages/client-runtime/src/preview/serverBrowserStream.ts
 +++ b/packages/client-runtime/src/preview/serverBrowserStream.ts
 @@ -454,7 +454,13 @@ const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
@@ -173,7 +182,7 @@ index b71fff335..9d5ab790a 100644
      : "This server's host is missing libraries its browser needs. Run this once on the host, then try again:";
 +};
 diff --git a/packages/contracts/src/preview.ts b/packages/contracts/src/preview.ts
-index 455663155..793b30a9f 100644
+index 455663155c..793b30a9ff 100644
 --- a/packages/contracts/src/preview.ts
 +++ b/packages/contracts/src/preview.ts
 @@ -154,6 +154,7 @@ export type PreviewRuntime = typeof PreviewRuntime.Type;

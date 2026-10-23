@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
-index dadbe8acc..79e41c7b6 100644
+index dadbe8acc7..79e41c7b66 100644
 --- a/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 +++ b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 @@ -1,5 +1,8 @@
@@ -38,7 +38,7 @@ index dadbe8acc..79e41c7b6 100644
  
 diff --git a/apps/desktop/src/backend/flatpakBackend.test.ts b/apps/desktop/src/backend/flatpakBackend.test.ts
 new file mode 100644
-index 000000000..cfc536d2e
+index 0000000000..cfc536d2e7
 --- /dev/null
 +++ b/apps/desktop/src/backend/flatpakBackend.test.ts
 @@ -0,0 +1,86 @@
@@ -130,7 +130,7 @@ index 000000000..cfc536d2e
 +});
 diff --git a/apps/desktop/src/backend/flatpakBackend.ts b/apps/desktop/src/backend/flatpakBackend.ts
 new file mode 100644
-index 000000000..e912b2119
+index 0000000000..e912b2119e
 --- /dev/null
 +++ b/apps/desktop/src/backend/flatpakBackend.ts
 @@ -0,0 +1,56 @@

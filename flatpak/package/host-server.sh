@@ -12,10 +12,11 @@ unset T3CODE_DESKTOP_HTTPS_ENDPOINTS T3CODE_TAILSCALE_SERVE T3CODE_TAILSCALE_SER
 cd "$HOME"
 
 export ELECTRON_RUN_AS_NODE=1
-# Desktop maintenance runs with the same runtime and sanitized host environment,
-# after the desktop has stopped its server. No user-facing CLI is installed.
-if [ "${1:-}" = "--compact-database" ]; then
-    exec "$T3CODE_FLATPAK_SERVER" --require "$T3CODE_FLATPAK_COMPILE_CACHE" "$T3CODE_FLATPAK_ENTRY" flatpak-compact-database --base-dir "$T3CODE_HOME"
+# Desktop maintenance runs with the same runtime and sanitized host environment.
+# The desktop stops its server first when compacting. No user-facing CLI is installed.
+if [ "${1:-}" = "--database-maintenance" ]; then
+    shift
+    exec "$T3CODE_FLATPAK_SERVER" --require "$T3CODE_FLATPAK_COMPILE_CACHE" "$T3CODE_FLATPAK_ENTRY" flatpak-database-maintenance --base-dir "$T3CODE_HOME" "$@"
 fi
 
 exec "$T3CODE_FLATPAK_SERVER" --require "$T3CODE_FLATPAK_COMPILE_CACHE" "$T3CODE_FLATPAK_ENTRY" --bootstrap-fd 3

@@ -1,8 +1,8 @@
 diff --git a/apps/server/src/cloud/selfUpdate.test.ts b/apps/server/src/cloud/selfUpdate.test.ts
-index 3a852c7bc..fd81bd5d1 100644
+index 352c89d06f..8e41d7ca64 100644
 --- a/apps/server/src/cloud/selfUpdate.test.ts
 +++ b/apps/server/src/cloud/selfUpdate.test.ts
-@@ -128,6 +128,28 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
+@@ -130,6 +130,28 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
  });
  
  it.layer(NodeServices.layer)("server self update", (it) => {
@@ -32,18 +32,18 @@ index 3a852c7bc..fd81bd5d1 100644
      Effect.gen(function* () {
        const events: string[] = [];
 diff --git a/apps/server/src/cloud/selfUpdate.ts b/apps/server/src/cloud/selfUpdate.ts
-index 10c2a7991..727feb6c7 100644
+index ef717c34bb..4f546a934c 100644
 --- a/apps/server/src/cloud/selfUpdate.ts
 +++ b/apps/server/src/cloud/selfUpdate.ts
-@@ -187,6 +187,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+@@ -216,6 +216,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
      yield* Config.String(CLI_RELEASE_BASE_URL_ENV).pipe(Config.option),
    );
    const inFlight = yield* Ref.make(false);
 +  const flatpakManaged = Boolean((yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER);
  
-   // A managed server starting means its launcher has settled on a version, so runtimes left by
-   // earlier updates can go.
-@@ -211,6 +212,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+   yield* pruneRuntimesOnStart({ baseDir: serverConfig.baseDir, managed: launcher.managed }).pipe(
+     Effect.forkScoped,
+@@ -231,6 +232,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
    const update: ServerSelfUpdate["Service"]["update"] = Effect.fn(
      "cloud.server_self_update.update",
    )(function* (input, reportProgress = () => Effect.void, onHandoffAccepted = () => Effect.void) {
@@ -55,7 +55,7 @@ index 10c2a7991..727feb6c7 100644
      if (capability === "desktop-managed") {
        if (desktopAppUpdate.available) {
          return yield* desktopAppUpdate.run(reportProgress);
-@@ -349,7 +355,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+@@ -369,7 +375,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
    return ServerSelfUpdate.of({
      update,
      commitDesktopUpdate: (requestId, onHandoffAccepted) =>
@@ -69,10 +69,10 @@ index 10c2a7991..727feb6c7 100644
  });
  
 diff --git a/apps/server/src/environment/ServerEnvironment.test.ts b/apps/server/src/environment/ServerEnvironment.test.ts
-index b17668002..cc21bad86 100644
+index 7cebccb2a1..8eb81cb64e 100644
 --- a/apps/server/src/environment/ServerEnvironment.test.ts
 +++ b/apps/server/src/environment/ServerEnvironment.test.ts
-@@ -96,7 +96,11 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
+@@ -90,7 +90,11 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
        yield* fs.symlink(entry, `${prefix}/bin/t3`);
        const config = yield* makeServerConfig(baseDir);
        yield* fs.makeDirectory(config.stateDir, { recursive: true });
@@ -85,7 +85,7 @@ index b17668002..cc21bad86 100644
          const descriptor = yield* Effect.gen(function* () {
            const environment = yield* ServerEnvironment.ServerEnvironment;
            return yield* environment.getDescriptor;
-@@ -104,13 +108,15 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
+@@ -98,13 +102,15 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
            Effect.provide(
              ServerEnvironment.layer.pipe(
                Layer.provide(layerEmptySecretStore),
@@ -103,7 +103,7 @@ index b17668002..cc21bad86 100644
          );
          expect(descriptor.capabilities.serverInstallation).toEqual(
            mode === "web" ? { kind: "npm-global", prefix } : undefined,
-@@ -118,6 +124,9 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
+@@ -112,6 +118,9 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
          expect(descriptor.capabilities.serverSelfUpdate).toBe(
            mode === "web" ? undefined : "desktop-managed",
          );
@@ -114,7 +114,7 @@ index b17668002..cc21bad86 100644
            settledWorktreeCleanup: true,
            storageCleanupRun: true,
 diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index fbb597056..6b1379d1f 100644
+index fbb5970560..6b1379d1f6 100644
 --- a/apps/server/src/environment/ServerEnvironment.ts
 +++ b/apps/server/src/environment/ServerEnvironment.ts
 @@ -202,8 +202,11 @@ export const make = Effect.gen(function* () {

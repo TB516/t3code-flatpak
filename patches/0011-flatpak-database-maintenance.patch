@@ -1,15 +1,18 @@
 diff --git a/apps/desktop/src/app/DesktopDatabaseMaintenance.test.ts b/apps/desktop/src/app/DesktopDatabaseMaintenance.test.ts
 new file mode 100644
-index 0000000000..dc19d91042
+index 0000000000..7799a47cea
 --- /dev/null
 +++ b/apps/desktop/src/app/DesktopDatabaseMaintenance.test.ts
-@@ -0,0 +1,195 @@
+@@ -0,0 +1,252 @@
++import * as NodeServices from "@effect/platform-node/NodeServices";
 +import { assert, afterEach, it, vi } from "@effect/vitest";
 +import * as Deferred from "effect/Deferred";
 +import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
 +import * as Fiber from "effect/Fiber";
 +import * as Layer from "effect/Layer";
 +import * as Option from "effect/Option";
++import * as Path from "effect/Path";
 +import * as Sink from "effect/Sink";
 +import * as Stream from "effect/Stream";
 +import * as ChildProcess from "effect/process/ChildProcess";
@@ -34,13 +37,22 @@ index 0000000000..dc19d91042
 +    ready?: boolean;
 +    confirm?: Effect.Effect<void>;
 +    stoppedPid?: number;
++    legacyDatabase?: boolean;
++    checkbox?: boolean;
 +  } = {},
 +) {
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const stateDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-flatpak-state-" });
++  if (options.legacyDatabase) {
++    yield* fs.writeFileString(path.join(stateDir, "state.sqlite"), "rollback");
++  }
 +  vi.stubEnv("FLATPAK_ID", "com.t3tools.t3code");
 +  vi.stubEnv("T3CODE_FLATPAK_RUNTIME", options.runtime ?? runtime);
 +  const order: string[] = [];
 +  const errors: string[] = [];
 +  const commands: ChildProcess.Command[] = [];
++  const confirmations: Electron.MessageBoxOptions[] = [];
 +  let stopped = false;
 +  const primary: DesktopBackendPool.DesktopBackendInstance = {
 +    id: DesktopBackendPool.PRIMARY_INSTANCE_ID,
@@ -73,10 +85,14 @@ index 0000000000..dc19d91042
 +    pickFiles: () => Effect.die("unexpected file picker"),
 +    showMessageBox: (input) =>
 +      Effect.gen(function* () {
-+        const confirm = input.type === "question";
++        const confirm = input.buttons !== undefined && input.buttons.length > 1;
 +        order.push(confirm ? "confirm" : "success");
++        if (confirm) confirmations.push(input);
 +        if (confirm && options.confirm) yield* options.confirm;
-+        return { response: confirm ? (options.response ?? 1) : 0, checkboxChecked: false };
++        return {
++          response: confirm ? (options.response ?? 1) : 0,
++          checkboxChecked: options.checkbox ?? false,
++        };
 +      }),
 +    showErrorBox: (_title, message) =>
 +      Effect.sync(() => {
@@ -86,8 +102,7 @@ index 0000000000..dc19d91042
 +  });
 +  const spawner = ChildProcessSpawner.make((command) =>
 +    Effect.sync(() => {
-+      assert.isTrue(stopped, "cleanup must not start before the server stops");
-+      order.push("compact");
++      order.push(stopped ? "compact" : "live");
 +      commands.push(command);
 +      const stdout = Stream.make(new TextEncoder().encode("Database: 2 GiB -> 1 GiB."));
 +      const stderr = Stream.make(new TextEncoder().encode("Not enough disk space."));
@@ -114,6 +129,7 @@ index 0000000000..dc19d91042
 +        Layer.succeed(DesktopEnvironment.DesktopEnvironment, {
 +          platform: "linux",
 +          baseDir,
++          stateDir,
 +        } as DesktopEnvironment.DesktopEnvironment["Service"]),
 +        Layer.succeed(ElectronDialog.ElectronDialog, dialog),
 +        Layer.mock(ElectronWindow.ElectronWindow)({
@@ -123,55 +139,57 @@ index 0000000000..dc19d91042
 +      ),
 +    ),
 +  );
-+  return { maintenance, order, errors, commands };
++  return { maintenance, order, errors, commands, confirmations };
 +});
 +
 +it.effect(
 +  "stops the server, cleans only its own database, and restarts before reporting success",
 +  () =>
 +    Effect.gen(function* () {
-+      const { maintenance, order, commands } = yield* harness();
-+      yield* maintenance.compact;
++      const { maintenance, order, commands, confirmations } = yield* harness();
++      yield* maintenance.run({ reclaimSpace: true });
 +      assert.deepEqual(order, ["confirm", "stop", "compact", "start", "ready", "success"]);
++      assert.isUndefined(confirmations[0]?.checkboxLabel);
 +      const command = commands[0]!;
 +      assert.equal(command._tag, "StandardCommand");
 +      if (command._tag !== "StandardCommand") return;
 +      assert.equal(command.command, "/usr/bin/flatpak-spawn");
-+      assert.deepEqual(command.args.slice(-3), [
++      assert.deepEqual(command.args.slice(-4), [
 +        "/bin/sh",
 +        `${runtime}/host-server.sh`,
-+        "--compact-database",
++        "--database-maintenance",
++        "--compact",
 +      ]);
 +      assert.include(command.args, `--env=T3CODE_FLATPAK_SERVER=${runtime}/t3code`);
 +      assert.include(command.args, `--env=T3CODE_HOME=${baseDir}`);
-+    }),
++    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 +
 +it.effect("cancelling the confirmation leaves the server running", () =>
 +  Effect.gen(function* () {
 +    const { maintenance, order } = yield* harness({ response: 0 });
-+    yield* maintenance.compact;
++    yield* maintenance.run({ reclaimSpace: true });
 +    assert.deepEqual(order, ["confirm"]);
-+  }),
++  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 +
 +it.effect("restarts after cleanup failure and reports the actual failure", () =>
 +  Effect.gen(function* () {
 +    const { maintenance, order, errors } = yield* harness({ exitCode: 1 });
-+    yield* maintenance.compact;
++    yield* maintenance.run({ reclaimSpace: true });
 +    assert.deepEqual(order, ["confirm", "stop", "compact", "start", "ready", "error"]);
 +    assert.include(errors[0]!, "Not enough disk space.");
 +    assert.include(errors[0]!, "The local server has restarted.");
-+  }),
++  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 +
 +it.effect("does not run maintenance when the server has not exited", () =>
 +  Effect.gen(function* () {
 +    const { maintenance, order, commands } = yield* harness({ stoppedPid: 123 });
-+    yield* maintenance.compact;
++    yield* maintenance.run({ reclaimSpace: true });
 +    assert.deepEqual(order, ["confirm", "stop", "start", "ready", "error"]);
 +    assert.equal(commands.length, 0);
-+  }),
++  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 +
 +it.effect("ignores a second request while confirmation is open", () =>
@@ -181,37 +199,78 @@ index 0000000000..dc19d91042
 +    const { maintenance, order } = yield* harness({
 +      confirm: Deferred.succeed(opened, undefined).pipe(Effect.andThen(Deferred.await(proceed))),
 +    });
-+    const first = yield* maintenance.compact.pipe(Effect.forkChild);
++    const first = yield* maintenance.run({ reclaimSpace: true }).pipe(Effect.forkChild);
 +    yield* Deferred.await(opened);
-+    yield* maintenance.compact;
++    yield* maintenance.run({ reclaimSpace: true });
 +    yield* Deferred.succeed(proceed, undefined);
 +    yield* Fiber.join(first);
 +    assert.equal(order.filter((entry) => entry === "compact").length, 1);
 +    assert.equal(order.filter((entry) => entry === "confirm").length, 1);
-+  }).pipe(Effect.scoped),
++  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 +
 +it.effect("does not expose cleanup without a Flatpak runtime", () =>
 +  Effect.gen(function* () {
 +    const { maintenance, order } = yield* harness({ runtime: "" });
 +    assert.isFalse(maintenance.supported);
-+    yield* maintenance.compact;
++    yield* maintenance.run({ reclaimSpace: true });
 +    assert.deepEqual(order, []);
-+  }),
++  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
++);
++
++it.effect("offers deleting the legacy database, unticked, alongside reclaiming space", () =>
++  Effect.gen(function* () {
++    const { maintenance, commands, confirmations } = yield* harness({
++      legacyDatabase: true,
++      checkbox: true,
++    });
++    assert.equal(yield* maintenance.legacyDatabaseBytes, "rollback".length);
++    yield* maintenance.run({ reclaimSpace: true });
++    assert.isString(confirmations[0]?.checkboxLabel);
++    assert.isFalse(confirmations[0]?.checkboxChecked);
++    const command = commands[0]!;
++    assert.equal(command._tag, "StandardCommand");
++    if (command._tag !== "StandardCommand") return;
++    assert.deepEqual(command.args.slice(-2), ["--compact", "--remove-legacy"]);
++  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
++);
++
++it.effect("deletes only the legacy database without stopping the server", () =>
++  Effect.gen(function* () {
++    const { maintenance, order, commands } = yield* harness({ legacyDatabase: true });
++    yield* maintenance.run({ reclaimSpace: false });
++    assert.deepEqual(order, ["confirm", "live", "success"]);
++    const command = commands[0]!;
++    assert.equal(command._tag, "StandardCommand");
++    if (command._tag !== "StandardCommand") return;
++    assert.deepEqual(command.args.slice(-2), ["--database-maintenance", "--remove-legacy"]);
++  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
++);
++
++it.effect("does nothing when only the legacy database was requested and it is gone", () =>
++  Effect.gen(function* () {
++    const { maintenance, order, confirmations } = yield* harness();
++    assert.isNull(yield* maintenance.legacyDatabaseBytes);
++    yield* maintenance.run({ reclaimSpace: false });
++    assert.deepEqual(order, []);
++    assert.equal(confirmations.length, 0);
++  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 diff --git a/apps/desktop/src/app/DesktopDatabaseMaintenance.ts b/apps/desktop/src/app/DesktopDatabaseMaintenance.ts
 new file mode 100644
-index 0000000000..c718d5a964
+index 0000000000..a407e26ed7
 --- /dev/null
 +++ b/apps/desktop/src/app/DesktopDatabaseMaintenance.ts
-@@ -0,0 +1,173 @@
+@@ -0,0 +1,246 @@
 +import * as Cause from "effect/Cause";
 +import * as Context from "effect/Context";
 +import * as Duration from "effect/Duration";
 +import * as Effect from "effect/Effect";
 +import * as Exit from "effect/Exit";
++import * as FileSystem from "effect/FileSystem";
 +import * as Layer from "effect/Layer";
 +import * as Option from "effect/Option";
++import * as Path from "effect/Path";
 +import * as Ref from "effect/Ref";
 +import * as Schema from "effect/Schema";
 +import * as Stream from "effect/Stream";
@@ -230,12 +289,23 @@ index 0000000000..c718d5a964
 +  { message: Schema.String },
 +) {}
 +
-+/** Coordinates offline cleanup of the Flatpak desktop's own database. */
++const formatSize = (bytes: number) => `${(bytes / 1024 ** 2).toFixed(0)} MiB`;
++
++/**
++ * Coordinates the `t3 doctor` database repairs for the Flatpak desktop's own database,
++ * since the Flatpak installs no `t3` command.
++ */
 +export class DesktopDatabaseMaintenance extends Context.Service<
 +  DesktopDatabaseMaintenance,
 +  {
 +    readonly supported: boolean;
-+    readonly compact: Effect.Effect<void>;
++    /** Size of the database kept from before 0.1.0 for rolling back, or null once it is gone. */
++    readonly legacyDatabaseBytes: Effect.Effect<number | null>;
++    /**
++     * Confirms, then reclaims space while the server is stopped and/or deletes the legacy
++     * database. The legacy database is only offered while it exists.
++     */
++    readonly run: (input: { readonly reclaimSpace: boolean }) => Effect.Effect<void>;
 +  }
 +>()("@t3tools/desktop/app/DesktopDatabaseMaintenance") {}
 +
@@ -247,176 +317,242 @@ index 0000000000..c718d5a964
 +  const windows = yield* ElectronWindow.ElectronWindow;
 +  const state = yield* DesktopState.DesktopState;
 +  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
 +  const busy = yield* Ref.make(false);
 +  const runtime = process.env.T3CODE_FLATPAK_RUNTIME;
 +  const supported =
 +    flatpakAppId(process.env, environment.platform) !== null && runtime?.startsWith("/") === true;
++  // Matches the server's DatabaseMaintenance, which keeps it next to statev2.sqlite.
++  const legacyPath = path.join(environment.stateDir, "state.sqlite");
 +
-+  const compact = Effect.gen(function* () {
-+    if (!supported || !runtime || (yield* Ref.get(state.quitting))) return;
-+    if (yield* Ref.getAndSet(busy, true)) return;
-+    yield* Effect.gen(function* () {
-+      const owner = Option.getOrUndefined(yield* windows.currentMainOrFirst);
-+      const confirmation = yield* dialog.showMessageBox(
-+        {
-+          type: "question",
-+          title: "Reclaim database space",
-+          message: "Reclaim space and restart the local server?",
-+          detail:
-+            "Finish active work first. T3 Code will temporarily disconnect while its local server stops and database cleanup runs. This can take several minutes and needs temporary disk space. The old rollback database will be kept.",
-+          buttons: ["Cancel", "Reclaim space and restart"],
-+          defaultId: 0,
-+          cancelId: 0,
-+          noLink: true,
-+        },
-+        owner,
-+      );
-+      if (confirmation.response !== 1 || (yield* Ref.get(state.quitting))) return;
-+      const primary = yield* pool.primary;
-+      const snapshot = yield* primary.snapshot;
-+      if (!snapshot.ready) {
-+        yield* dialog.showErrorBox(
-+          "Database cleanup unavailable",
-+          "Wait for the local server to finish starting, then try again.",
++  const legacyDatabaseBytes = fs.stat(legacyPath).pipe(
++    Effect.map((info) => Number(info.size)),
++    Effect.orElseSucceed(() => null),
++  );
++
++  // Run the installed package directly on the host, with no CLI launcher or service install.
++  const runHostMaintenance = (flags: ReadonlyArray<string>) =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const child = yield* spawner.spawn(
++          ChildProcess.make(
++            "/usr/bin/flatpak-spawn",
++            [
++              "--host",
++              "--watch-bus",
++              `--directory=${runtime}`,
++              `--env=T3CODE_HOME=${environment.baseDir}`,
++              `--env=T3CODE_FLATPAK_SERVER=${runtime}/t3code`,
++              `--env=T3CODE_FLATPAK_ENTRY=${runtime}/resources/app.asar/apps/server/dist/bin.mjs`,
++              `--env=T3CODE_FLATPAK_COMPILE_CACHE=${runtime}/resources/app.asar/apps/desktop/dist-electron/compileCache.cjs`,
++              "/bin/sh",
++              `${runtime}/host-server.sh`,
++              "--database-maintenance",
++              ...flags,
++            ],
++            { stdin: "ignore" },
++          ),
 +        );
-+        return;
-+      }
-+
-+      // Run the installed package directly on the host, with no CLI launcher or service install.
-+      const result = yield* Effect.gen(function* () {
-+        yield* primary.stop();
-+        const stopped = yield* primary.snapshot;
-+        if (Option.isSome(stopped.activePid)) {
++        const [output, errors, code] = yield* Effect.all(
++          [
++            child.stdout.pipe(Stream.decodeText(), Stream.mkString),
++            child.stderr.pipe(Stream.decodeText(), Stream.mkString),
++            child.exitCode,
++          ],
++          { concurrency: "unbounded" },
++        );
++        if (code !== 0) {
 +          return yield* Effect.fail(
 +            new DesktopDatabaseCleanupError({
-+              message: "The local server did not stop. Database cleanup was not started.",
++              message: errors.trim() || output.trim() || "Database cleanup failed.",
 +            }),
 +          );
 +        }
-+        return yield* Effect.scoped(
-+          Effect.gen(function* () {
-+            const child = yield* spawner.spawn(
-+              ChildProcess.make(
-+                "/usr/bin/flatpak-spawn",
-+                [
-+                  "--host",
-+                  "--watch-bus",
-+                  `--directory=${runtime}`,
-+                  `--env=T3CODE_HOME=${environment.baseDir}`,
-+                  `--env=T3CODE_FLATPAK_SERVER=${runtime}/t3code`,
-+                  `--env=T3CODE_FLATPAK_ENTRY=${runtime}/resources/app.asar/apps/server/dist/bin.mjs`,
-+                  `--env=T3CODE_FLATPAK_COMPILE_CACHE=${runtime}/resources/app.asar/apps/desktop/dist-electron/compileCache.cjs`,
-+                  "/bin/sh",
-+                  `${runtime}/host-server.sh`,
-+                  "--compact-database",
-+                ],
-+                { stdin: "ignore" },
-+              ),
-+            );
-+            const [output, errors, code] = yield* Effect.all(
-+              [
-+                child.stdout.pipe(Stream.decodeText(), Stream.mkString),
-+                child.stderr.pipe(Stream.decodeText(), Stream.mkString),
-+                child.exitCode,
-+              ],
-+              { concurrency: "unbounded" },
-+            );
-+            if (code !== 0) {
-+              return yield* Effect.fail(
-+                new DesktopDatabaseCleanupError({
-+                  message: errors.trim() || output.trim() || "Database cleanup failed.",
++        return output.trim();
++      }),
++    );
++
++  const errorMessage = (cause: Cause.Cause<unknown>) => {
++    const error = Cause.squash(cause);
++    return error instanceof Error ? error.message : String(error);
++  };
++
++  const run = (input: { readonly reclaimSpace: boolean }) =>
++    Effect.gen(function* () {
++      if (!supported || !runtime || (yield* Ref.get(state.quitting))) return;
++      if (yield* Ref.getAndSet(busy, true)) return;
++      yield* Effect.gen(function* () {
++        const owner = Option.getOrUndefined(yield* windows.currentMainOrFirst);
++        const legacyBytes = yield* legacyDatabaseBytes;
++
++        if (!input.reclaimSpace) {
++          if (legacyBytes === null) return;
++          const confirmation = yield* dialog.showMessageBox(
++            {
++              type: "warning",
++              title: "Delete old database",
++              message: "Delete the database from before 0.1.0?",
++              detail: `Frees ${formatSize(legacyBytes)}. Your threads and settings are already in the current database. After this, T3 Code versions before 0.1.0 start with no threads or settings, so you can no longer roll back to them.`,
++              buttons: ["Cancel", "Delete database"],
++              defaultId: 0,
++              cancelId: 0,
++              noLink: true,
++            },
++            owner,
++          );
++          if (confirmation.response !== 1 || (yield* Ref.get(state.quitting))) return;
++          // Only versions before 0.1.0 open this file, so the server keeps running.
++          const result = yield* runHostMaintenance(["--remove-legacy"]).pipe(Effect.exit);
++          if (Exit.isFailure(result)) {
++            yield* dialog.showErrorBox("Database cleanup failed", errorMessage(result.cause));
++            return;
++          }
++          yield* dialog.showMessageBox(
++            {
++              type: "info",
++              title: "Database cleanup complete",
++              message: "Deleted the database from before 0.1.0.",
++              buttons: ["OK"],
++            },
++            owner,
++          );
++          return;
++        }
++
++        const confirmation = yield* dialog.showMessageBox(
++          {
++            type: "question",
++            title: "Reclaim database space",
++            message: "Reclaim space and restart the local server?",
++            detail:
++              "Finish active work first. T3 Code will temporarily disconnect while its local server stops and database cleanup runs. This can take several minutes and needs temporary disk space. Afterwards, the server returns freed space to disk on its own.",
++            buttons: ["Cancel", "Reclaim space and restart"],
++            defaultId: 0,
++            cancelId: 0,
++            noLink: true,
++            ...(legacyBytes === null
++              ? {}
++              : {
++                  checkboxLabel: `Also delete the database from before 0.1.0 (${formatSize(legacyBytes)}). T3 Code versions before 0.1.0 will then start with no threads or settings.`,
++                  checkboxChecked: false,
 +                }),
-+              );
-+            }
-+            return output.trim();
-+          }),
++          },
++          owner,
 +        );
-+      }).pipe(
-+        Effect.ensuring(
-+          Effect.gen(function* () {
-+            if (!(yield* Ref.get(state.quitting))) yield* primary.start;
-+          }),
-+        ),
-+        Effect.exit,
-+      );
-+      if (yield* Ref.get(state.quitting)) return;
-+      const ready = yield* primary.waitForReady(Duration.seconds(60));
-+      if (Exit.isFailure(result)) {
-+        const error = Cause.squash(result.cause);
-+        yield* dialog.showErrorBox(
-+          "Database cleanup failed",
-+          `${error instanceof Error ? error.message : String(error)}\n\n${ready ? "The local server has restarted." : "The local server has not become ready. Close and reopen T3 Code to retry starting it."}`,
++        if (confirmation.response !== 1 || (yield* Ref.get(state.quitting))) return;
++        const primary = yield* pool.primary;
++        const snapshot = yield* primary.snapshot;
++        if (!snapshot.ready) {
++          yield* dialog.showErrorBox(
++            "Database cleanup unavailable",
++            "Wait for the local server to finish starting, then try again.",
++          );
++          return;
++        }
++
++        const result = yield* Effect.gen(function* () {
++          yield* primary.stop();
++          const stopped = yield* primary.snapshot;
++          if (Option.isSome(stopped.activePid)) {
++            return yield* Effect.fail(
++              new DesktopDatabaseCleanupError({
++                message: "The local server did not stop. Database cleanup was not started.",
++              }),
++            );
++          }
++          return yield* runHostMaintenance([
++            "--compact",
++            ...(confirmation.checkboxChecked ? ["--remove-legacy"] : []),
++          ]);
++        }).pipe(
++          Effect.ensuring(
++            Effect.gen(function* () {
++              if (!(yield* Ref.get(state.quitting))) yield* primary.start;
++            }),
++          ),
++          Effect.exit,
 +        );
-+        return;
-+      }
-+      yield* dialog.showMessageBox(
-+        {
-+          type: ready ? "info" : "warning",
-+          title: "Database cleanup complete",
-+          message: ready
-+            ? "Database space reclaimed. The local server has restarted."
-+            : "Database space reclaimed, but the local server has not become ready.",
-+          detail:
-+            result.value +
-+            (ready ? "" : "\nClose and reopen T3 Code to retry starting the server."),
-+          buttons: ["OK"],
-+        },
-+        owner,
-+      );
-+    }).pipe(Effect.ensuring(Ref.set(busy, false)));
-+  }).pipe(
-+    Effect.catchCause((cause) => {
-+      const error = Cause.squash(cause);
-+      return dialog.showErrorBox(
-+        "Database cleanup failed",
-+        error instanceof Error ? error.message : String(error),
-+      );
-+    }),
-+    Effect.withSpan("desktop.databaseMaintenance.compact"),
-+  );
-+  return DesktopDatabaseMaintenance.of({ supported, compact });
++        if (yield* Ref.get(state.quitting)) return;
++        const ready = yield* primary.waitForReady(Duration.seconds(60));
++        if (Exit.isFailure(result)) {
++          yield* dialog.showErrorBox(
++            "Database cleanup failed",
++            `${errorMessage(result.cause)}\n\n${ready ? "The local server has restarted." : "The local server has not become ready. Close and reopen T3 Code to retry starting it."}`,
++          );
++          return;
++        }
++        yield* dialog.showMessageBox(
++          {
++            type: ready ? "info" : "warning",
++            title: "Database cleanup complete",
++            message: ready
++              ? "Database space reclaimed. The local server has restarted."
++              : "Database space reclaimed, but the local server has not become ready.",
++            detail:
++              result.value +
++              (ready ? "" : "\nClose and reopen T3 Code to retry starting the server."),
++            buttons: ["OK"],
++          },
++          owner,
++        );
++      }).pipe(Effect.ensuring(Ref.set(busy, false)));
++    }).pipe(
++      Effect.catchCause((cause) =>
++        dialog.showErrorBox("Database cleanup failed", errorMessage(cause)),
++      ),
++      Effect.withSpan("desktop.databaseMaintenance.run"),
++    );
++
++  return DesktopDatabaseMaintenance.of({ supported, legacyDatabaseBytes, run });
 +});
 +
 +export const layer = Layer.effect(DesktopDatabaseMaintenance, make);
 diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-index 2d67aa56e6..cc799ba42c 100644
+index 2d67aa56e6..d1dfb09afe 100644
 --- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
 +++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-@@ -84,6 +84,8 @@ import {
+@@ -84,6 +84,12 @@ import {
    uninstallCliCommand,
  } from "./methods/cliCommand.ts";
  
-+import { getDatabaseMaintenanceSupported, compactDatabase } from "./methods/databaseMaintenance.ts";
++import {
++  getDatabaseMaintenanceSupported,
++  getLegacyDatabaseBytes,
++  runDatabaseMaintenance,
++} from "./methods/databaseMaintenance.ts";
 +
  export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
    const ipc = yield* DesktopIpc.DesktopIpc;
    yield* installNotificationBadge();
-@@ -93,6 +95,8 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+@@ -93,6 +99,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
    yield* ipc.handle(AppActivationIpc.complete);
    yield* ipc.handle(WebLinksIpc.setReady);
  
 +  yield* ipc.handleSync(getDatabaseMaintenanceSupported);
-+  yield* ipc.handle(compactDatabase);
++  yield* ipc.handle(getLegacyDatabaseBytes);
++  yield* ipc.handle(runDatabaseMaintenance);
    yield* ipc.handleSync(takeLegacyLocalStorage);
    yield* ipc.handle(completeLegacyLocalStorage);
    yield* ipc.handleSync(getAppBranding);
 diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
-index 9b11a2283a..5d5a604538 100644
+index 9b11a2283a..ab6a56e583 100644
 --- a/apps/desktop/src/ipc/channels.ts
 +++ b/apps/desktop/src/ipc/channels.ts
-@@ -125,3 +125,6 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
+@@ -125,3 +125,7 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
  export const CANCEL_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:cancel-provider-auth-callback";
  export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-storage";
  export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
 +
 +export const DATABASE_MAINTENANCE_SUPPORTED_CHANNEL = "desktop:database-maintenance-supported";
-+export const DATABASE_MAINTENANCE_COMPACT_CHANNEL = "desktop:database-maintenance-compact";
++export const DATABASE_MAINTENANCE_LEGACY_BYTES_CHANNEL = "desktop:database-maintenance-legacy-bytes";
++export const DATABASE_MAINTENANCE_RUN_CHANNEL = "desktop:database-maintenance-run";
 diff --git a/apps/desktop/src/ipc/methods/databaseMaintenance.ts b/apps/desktop/src/ipc/methods/databaseMaintenance.ts
 new file mode 100644
-index 0000000000..2bb55574f9
+index 0000000000..00cb4b9191
 --- /dev/null
 +++ b/apps/desktop/src/ipc/methods/databaseMaintenance.ts
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,33 @@
 +import * as Effect from "effect/Effect";
 +import * as Schema from "effect/Schema";
 +
@@ -432,12 +568,22 @@ index 0000000000..2bb55574f9
 +  }),
 +});
 +
-+export const compactDatabase = makeIpcMethod({
-+  channel: IpcChannels.DATABASE_MAINTENANCE_COMPACT_CHANNEL,
++export const getLegacyDatabaseBytes = makeIpcMethod({
++  channel: IpcChannels.DATABASE_MAINTENANCE_LEGACY_BYTES_CHANNEL,
 +  payload: Schema.Void,
++  result: Schema.NullOr(Schema.Number),
++  handler: Effect.fn("desktop.ipc.databaseMaintenance.legacyDatabaseBytes")(function* () {
++    return yield* (yield* DesktopDatabaseMaintenance.DesktopDatabaseMaintenance)
++      .legacyDatabaseBytes;
++  }),
++});
++
++export const runDatabaseMaintenance = makeIpcMethod({
++  channel: IpcChannels.DATABASE_MAINTENANCE_RUN_CHANNEL,
++  payload: Schema.Struct({ reclaimSpace: Schema.Boolean }),
 +  result: Schema.Void,
-+  handler: Effect.fn("desktop.ipc.databaseMaintenance.compact")(function* () {
-+    yield* (yield* DesktopDatabaseMaintenance.DesktopDatabaseMaintenance).compact;
++  handler: Effect.fn("desktop.ipc.databaseMaintenance.run")(function* (input) {
++    yield* (yield* DesktopDatabaseMaintenance.DesktopDatabaseMaintenance).run(input);
 +  }),
 +});
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
@@ -461,17 +607,19 @@ index 3056ce1ea2..755abd68b2 100644
  ).pipe(
    Layer.provideMerge(layerDesktopSnapShot),
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index bffa02d9ca..7c25290483 100644
+index bffa02d9ca..495f2ce1b4 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
-@@ -271,6 +271,13 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+@@ -271,6 +271,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
    checkForUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_CHECK_CHANNEL),
    downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
    installUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL),
 +  ...(ipcRenderer.sendSync(IpcChannels.DATABASE_MAINTENANCE_SUPPORTED_CHANNEL) === true
 +    ? {
 +        databaseMaintenance: {
-+          compact: () => ipcRenderer.invoke(IpcChannels.DATABASE_MAINTENANCE_COMPACT_CHANNEL),
++          legacyDatabaseBytes: () =>
++            ipcRenderer.invoke(IpcChannels.DATABASE_MAINTENANCE_LEGACY_BYTES_CHANNEL),
++          run: (input) => ipcRenderer.invoke(IpcChannels.DATABASE_MAINTENANCE_RUN_CHANNEL, input),
 +        },
 +      }
 +    : {}),
@@ -479,25 +627,25 @@ index bffa02d9ca..7c25290483 100644
      getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
      install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
 diff --git a/apps/server/src/binCli.ts b/apps/server/src/binCli.ts
-index b0a2ceffef..78198fdc50 100644
+index 2f7c24536c..95fe9f964d 100644
 --- a/apps/server/src/binCli.ts
 +++ b/apps/server/src/binCli.ts
 @@ -1,4 +1,4 @@
 -import { doctorCommand } from "./cli/doctor.ts";
-+import { doctorCommand, flatpakCompactDatabaseCommand } from "./cli/doctor.ts";
++import { doctorCommand, flatpakDatabaseMaintenanceCommand } from "./cli/doctor.ts";
  import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
  import * as NodeServices from "@effect/platform-node/NodeServices";
  import * as Effect from "effect/Effect";
-@@ -87,6 +87,7 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
+@@ -89,6 +89,7 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
        themeCommand,
        traceCommand,
        doctorCommand,
-+      flatpakCompactDatabaseCommand,
++      flatpakDatabaseMaintenanceCommand,
        triageCommand,
        cloudEnabled ? connectCommand : connectUnavailableCommand,
      ]),
 diff --git a/apps/server/src/cli/doctor.test.ts b/apps/server/src/cli/doctor.test.ts
-index 5743763254..fd7e06c9c4 100644
+index 5743763254..a29fecfdcc 100644
 --- a/apps/server/src/cli/doctor.test.ts
 +++ b/apps/server/src/cli/doctor.test.ts
 @@ -1,10 +1,21 @@
@@ -519,17 +667,17 @@ index 5743763254..fd7e06c9c4 100644
  
  import * as BootService from "../cloud/bootService.ts";
 -import { runDoctor } from "./doctor.ts";
-+import { runDoctor, flatpakCompactDatabaseCommand } from "./doctor.ts";
++import { runDoctor, flatpakDatabaseMaintenanceCommand } from "./doctor.ts";
  import { DatabaseMaintenance } from "../persistence/DatabaseMaintenance.ts";
  
  it.effect(
-@@ -55,3 +66,42 @@ it.effect(
+@@ -55,3 +66,51 @@ it.effect(
        assert.deepEqual(calls, ["pause", "compact", "resume"]);
      }),
  );
 +
 +it.effect(
-+  "the Flatpak desktop command compacts its database without a service and keeps the rollback database",
++  "the Flatpak desktop command compacts without a service and deletes the rollback database only on request",
 +  () =>
 +    Effect.gen(function* () {
 +      const fs = yield* FileSystem.FileSystem;
@@ -548,26 +696,35 @@ index 5743763254..fd7e06c9c4 100644
 +          ),
 +        ),
 +      );
-+      yield* fs.writeFileString(legacy, "retained rollback database");
-+      yield* Command.runWith(flatpakCompactDatabaseCommand, { version: "0.0.0" })([
-+        "--base-dir",
-+        baseDir,
-+      ]).pipe(
-+        Effect.provide(NetService.layer),
-+        Effect.provideService(HostProcess.Environment, {
-+          T3CODE_FLATPAK_SERVER: "/installed/flatpak/t3code",
-+        }),
++      yield* Effect.flatMap(SqlClient.SqlClient, (sql) => sql`CREATE TABLE rollback (id)`).pipe(
++        Effect.provide(NodeSqliteClient.layer({ filename: legacy })),
 +      );
-+      assert.equal(yield* fs.readFileString(legacy), "retained rollback database");
++      const run = (...args: ReadonlyArray<string>) =>
++        Command.runWith(flatpakDatabaseMaintenanceCommand, { version: "0.0.0" })([
++          "--base-dir",
++          baseDir,
++          ...args,
++        ]).pipe(
++          Effect.provide(NetService.layer),
++          Effect.provideService(HostProcess.Environment, {
++            T3CODE_FLATPAK_SERVER: "/installed/flatpak/t3code",
++          }),
++        );
++
++      yield* run("--compact");
++      assert.isTrue(yield* fs.exists(legacy));
 +      const mode = yield* Effect.flatMap(
 +        SqlClient.SqlClient,
 +        (sql) => sql<{ auto_vacuum: number }>`PRAGMA auto_vacuum`,
 +      ).pipe(Effect.provide(NodeSqliteClient.layer({ filename: dbPath, readonly: true })));
 +      assert.equal(mode[0]?.auto_vacuum, 2);
++
++      yield* run("--remove-legacy");
++      assert.isFalse(yield* fs.exists(legacy));
 +    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 diff --git a/apps/server/src/cli/doctor.ts b/apps/server/src/cli/doctor.ts
-index 850e67daf5..92b639c0d8 100644
+index 850e67daf5..d2a69f67be 100644
 --- a/apps/server/src/cli/doctor.ts
 +++ b/apps/server/src/cli/doctor.ts
 @@ -1,8 +1,10 @@
@@ -581,14 +738,19 @@ index 850e67daf5..92b639c0d8 100644
  
  import * as BootService from "../cloud/bootService.ts";
  import * as DatabaseMaintenance from "../persistence/DatabaseMaintenance.ts";
-@@ -148,3 +150,29 @@ export const doctorCommand = Command.make("doctor", {
+@@ -148,3 +150,40 @@ export const doctorCommand = Command.make("doctor", {
      }),
    ),
  );
 +
-+/** Internal Flatpak desktop action. Never reconciles services or removes the rollback database. */
-+export const flatpakCompactDatabaseCommand = Command.make("flatpak-compact-database", {
++/**
++ * Internal Flatpak desktop action, run by the desktop after its confirmation dialog.
++ * Never reconciles services. `--compact` needs the desktop to have stopped its server.
++ */
++export const flatpakDatabaseMaintenanceCommand = Command.make("flatpak-database-maintenance", {
 +  ...projectLocationFlags,
++  compact: Flag.Boolean("compact").pipe(Flag.withDefault(false)),
++  removeLegacy: Flag.Boolean("remove-legacy").pipe(Flag.withDefault(false)),
 +}).pipe(
 +  Command.unlisted,
 +  Command.withHandler((flags) =>
@@ -601,25 +763,33 @@ index 850e67daf5..92b639c0d8 100644
 +        );
 +      }
 +      const config = yield* resolveCliAuthConfig(flags, yield* GlobalFlag.LogLevel);
-+      const result = yield* Effect.gen(function* () {
++      yield* Effect.gen(function* () {
 +        const maintenance = yield* DatabaseMaintenance.DatabaseMaintenance;
-+        return yield* maintenance.compact(config.dbPath);
++        if (flags.compact) {
++          const result = yield* maintenance.compact(config.dbPath);
++          yield* Console.log(
++            `Database: ${formatBytes(result.beforeBytes)} -> ${formatBytes(result.afterBytes)}. ${result.deletedEventCount} superseded events removed.`,
++          );
++        }
++        if (flags.removeLegacy) {
++          yield* maintenance.removeLegacyDatabase(config.dbPath);
++          yield* Console.log("Deleted the database from before 0.1.0.");
++        }
 +      }).pipe(Effect.provide(DatabaseMaintenance.layer));
-+      yield* Console.log(
-+        `Database: ${formatBytes(result.beforeBytes)} -> ${formatBytes(result.afterBytes)}. ${result.deletedEventCount} superseded events removed.`,
-+      );
 +    }),
 +  ),
 +);
 diff --git a/apps/web/src/components/settings/DatabaseStorageNotice.tsx b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
-index 637c920f5e..00f726a89f 100644
+index 08ccf816a9..fa8f1d484c 100644
 --- a/apps/web/src/components/settings/DatabaseStorageNotice.tsx
 +++ b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
-@@ -1,15 +1,18 @@
+@@ -1,42 +1,123 @@
  import { useAtomValue } from "@effect/atom-react";
- import { shouldRecommendDatabaseCompaction, type EnvironmentId } from "@t3tools/contracts";
+-import type { EnvironmentId } from "@t3tools/contracts";
++import type { DatabaseStorageStatus, EnvironmentId } from "@t3tools/contracts";
++import { AsyncResult, Atom } from "effect/reactivity";
  import * as Schema from "effect/Schema";
-+import { useState } from "react";
++import { useEffect, useState } from "react";
  
  import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
  import { useLocalStorage } from "../../hooks/useLocalStorage";
@@ -627,27 +797,62 @@ index 637c920f5e..00f726a89f 100644
  import { serverEnvironment } from "../../state/server";
 +import { stackedThreadToast, toastManager } from "../ui/toast";
  import { Button } from "../ui/button";
- import { SettingsGroup } from "./SettingsGroup";
  import { SettingsRow, SettingsSection } from "./settingsLayout";
  
--/** Suggests `t3 doctor` for a database that still holds at least 1 GiB of freed pages. */
-+/** Offers database maintenance when offline compaction is recommended. */
+ const DismissedEnvironmentIds = Schema.Array(Schema.String);
++const NO_LOCAL_DATABASE_STORAGE = Atom.make(
++  AsyncResult.initial<DatabaseStorageStatus | null, never>(false),
++).pipe(Atom.withLabel("database-storage-notice:no-local-database"));
+ 
+-/** Suggests `t3 doctor` on every machine whose database still holds at least 1 GiB of freed pages. */
++const formatSize = (bytes: number) => `${(bytes / 1024 ** 2).toFixed(0)} MiB`;
++
++/**
++ * Suggests `t3 doctor` on every machine whose database still holds at least 1 GiB of freed
++ * pages. The Flatpak desktop has no `t3` command, so it offers the same repairs for its own
++ * database until they are done.
++ */
  export function DatabaseStorageNotice({
-   environmentId,
-   label,
-@@ -24,30 +27,77 @@ export function DatabaseStorageNotice({
-     Schema.Boolean,
+   environments,
+ }: {
+   environments: ReadonlyArray<{ readonly environmentId: EnvironmentId; readonly label: string }>;
+ }) {
++  const primaryEnvironmentId = usePrimaryEnvironmentId();
++  const maintenance = window.desktopBridge?.databaseMaintenance;
++  const local = maintenance
++    ? environments.find((environment) => environment.environmentId === primaryEnvironmentId)
++    : undefined;
++  const remoteEnvironments = environments.filter((environment) => environment !== local);
+   const recommendations = useAtomValue(
+     serverEnvironment.databaseCompactionRecommendations(
+-      JSON.stringify(environments.map((environment) => environment.environmentId)),
++      JSON.stringify(remoteEnvironments.map((environment) => environment.environmentId)),
+     ),
+   );
++  const localStorage = useAtomValue(
++    local
++      ? serverEnvironment.databaseStorage({ environmentId: local.environmentId, input: {} })
++      : NO_LOCAL_DATABASE_STORAGE,
++  );
++  const localEnvironmentId = local?.environmentId;
++  const [legacyDatabaseBytes, setLegacyDatabaseBytes] = useState<number | null>(null);
++  useEffect(() => {
++    if (!maintenance || !localEnvironmentId) return;
++    void maintenance.legacyDatabaseBytes().then(setLegacyDatabaseBytes);
++  }, [maintenance, localEnvironmentId]);
+   const [dismissed, setDismissed] = useLocalStorage(
+     "database-storage-notice-dismissed",
+     [],
+     DismissedEnvironmentIds,
    );
    const { copyToClipboard } = useCopyToClipboard({ target: "command" });
-+  const primaryEnvironmentId = usePrimaryEnvironmentId();
-+  const maintenance =
-+    environmentId === primaryEnvironmentId ? window.desktopBridge?.databaseMaintenance : undefined;
 +  const [pending, setPending] = useState(false);
-+  const compact = async () => {
++  const runMaintenance = async (reclaimSpace: boolean) => {
 +    if (!maintenance || pending) return;
 +    setPending(true);
 +    try {
-+      await maintenance.compact();
++      await maintenance.run({ reclaimSpace });
++      setLegacyDatabaseBytes(await maintenance.legacyDatabaseBytes());
 +    } catch (error) {
 +      toastManager.add(
 +        stackedThreadToast({
@@ -661,83 +866,69 @@ index 637c920f5e..00f726a89f 100644
 +      setPending(false);
 +    }
 +  };
-   const status = result._tag === "Success" ? result.value : null;
-   if (dismissed || status === null || !shouldRecommendDatabaseCompaction(status)) return null;
++
++  const localStatus = localStorage._tag === "Success" ? localStorage.value : null;
++  // Once converted, the server returns freed space to disk on its own.
++  const reclaimSpace = localStatus !== null && !localStatus.incrementalVacuumEnabled;
++  const showLocal = local !== undefined && (reclaimSpace || legacyDatabaseBytes !== null);
+   const visible = recommendations.filter(
+     (recommendation) => !dismissed.includes(recommendation.environmentId),
+   );
+-  if (visible.length === 0) return null;
++  if (!showLocal && visible.length === 0) return null;
    return (
-     <SettingsSection id={`storage-database-${environmentId}`} title="Database">
-       <SettingsGroup>
-         <SettingsRow
--          title={`Reclaim ${(status.reclaimableBytes / 1024 ** 3).toFixed(1)} GiB on ${label}`}
-+          title={
-+            maintenance
-+              ? `Database storage on ${label}`
-+              : `Reclaim ${(status.reclaimableBytes / 1024 ** 3).toFixed(1)} GiB on ${label}`
+     <SettingsSection id="storage-database" title="Database">
+-      <SettingsRow
+-        title="Reclaim freed database space"
+-        description="Old history is cleaned up automatically, but these databases still hold the freed space. Run the command on each machine to return it to disk; it pauses and restarts the background service. Quit the desktop app first if it hosts the environment."
+-      />
++      {showLocal && (
++        <SettingsRow
++          title={`Database on ${local.label}`}
++          description={
++            <>
++              {reclaimSpace &&
++                `${formatSize(localStatus.reclaimableBytes)} of ${formatSize(localStatus.databaseBytes)} can be returned to disk. Reclaiming it once turns on automatic shrinking and restarts the local server.`}
++              {reclaimSpace && legacyDatabaseBytes !== null && " "}
++              {legacyDatabaseBytes !== null &&
++                `The database from before 0.1.0 (${formatSize(legacyDatabaseBytes)}) is kept for rolling back.`}
++            </>
 +          }
-           description={
--            <>
--              Old history is cleaned up automatically, but this database still holds the freed
--              space. Run the command on {label} to return it to disk; it pauses and restarts the
--              background service. Quit the desktop app first if it hosts this environment.
--              <code className="mt-2 block select-text break-all">{status.compactCommand}</code>
--            </>
-+            maintenance ? (
-+              <>
-+                The database uses {(status.databaseBytes / 1024 ** 2).toFixed(1)} MiB, with{" "}
-+                {(status.reclaimableBytes / 1024 ** 2).toFixed(1)} MiB available to reclaim.
-+                Reclaiming space temporarily stops the local server. Finish active work first;
-+                cleanup can take several minutes and needs temporary disk space. The server restarts
-+                afterward.
-+              </>
-+            ) : (
-+              <>
-+                Old history is cleaned up automatically, but this database still holds the freed
-+                space. Run the command on {label} to return it to disk; it pauses and restarts the
-+                background service. Quit the desktop app first if it hosts this environment.
-+                <code className="mt-2 block select-text break-all">{status.compactCommand}</code>
-+              </>
-+            )
-           }
-           control={
-             <div className="flex flex-wrap items-center gap-1.5">
--              <Button
--                variant="outline"
--                size="sm"
--                onClick={() => copyToClipboard(status.compactCommand, undefined)}
--              >
--                Copy command
--              </Button>
-+              {maintenance ? (
-+                <Button
-+                  variant="outline"
-+                  size="sm"
-+                  disabled={pending}
-+                  onClick={() => void compact()}
-+                >
-+                  {pending ? "Reclaiming space…" : "Reclaim space and restart"}
-+                </Button>
-+              ) : (
-+                <Button
-+                  variant="outline"
-+                  size="sm"
-+                  onClick={() => copyToClipboard(status.compactCommand, undefined)}
-+                >
-+                  Copy command
-+                </Button>
-+              )}
-               <Button variant="ghost" size="sm" onClick={() => setDismissed(true)}>
-                 Dismiss
-               </Button>
++          control={
++            <Button
++              variant="outline"
++              size="xs"
++              disabled={pending}
++              onClick={() => void runMaintenance(reclaimSpace)}
++            >
++              {pending ? "Working…" : reclaimSpace ? "Reclaim space…" : "Delete old database…"}
++            </Button>
++          }
++        />
++      )}
++      {visible.length > 0 && (
++        <SettingsRow
++          title="Reclaim freed database space"
++          description="Old history is cleaned up automatically, but these databases still hold the freed space. Run the command on each machine to return it to disk; it pauses and restarts the background service. Quit the desktop app first if it hosts the environment."
++        />
++      )}
+       {visible.map(({ environmentId, status }) => (
+         <SettingsRow
+           key={environmentId}
 diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
-index d1f6b34939..02012f6d9b 100644
+index d1f6b34939..4ad42778ce 100644
 --- a/packages/contracts/src/ipc.ts
 +++ b/packages/contracts/src/ipc.ts
-@@ -1135,6 +1135,10 @@ export interface DesktopBridge {
+@@ -1135,6 +1135,13 @@ export interface DesktopBridge {
    downloadUpdate: () => Promise<DesktopUpdateActionResult>;
    installUpdate: () => Promise<DesktopUpdateActionResult>;
    onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
-+  /** Offline cleanup of this Flatpak desktop's local database, with confirmation and restart. */
++  /** The `t3 doctor` database repairs for this Flatpak desktop's local database. */
 +  databaseMaintenance?: {
-+    compact: () => Promise<void>;
++    /** Size of the database kept from before 0.1.0 for rolling back, or null once it is gone. */
++    legacyDatabaseBytes: () => Promise<number | null>;
++    /** Confirms, then reclaims space (restarting the server) and/or deletes the legacy database. */
++    run: (input: { reclaimSpace: boolean }) => Promise<void>;
 +  };
    cliCommand?: {
      getState: () => Promise<DesktopCliCommandState>;
