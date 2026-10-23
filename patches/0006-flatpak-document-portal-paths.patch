@@ -1,33 +1,35 @@
 diff --git a/apps/desktop/src/electron/ElectronDialog.test.ts b/apps/desktop/src/electron/ElectronDialog.test.ts
-index 2ed5a1f2f..aa1b59fde 100644
---- a/apps/desktop/src/electron/ElectronDialog.test.ts
+new file mode 100644
+index 0000000000..a9675e5e6f
+--- /dev/null
 +++ b/apps/desktop/src/electron/ElectronDialog.test.ts
-@@ -3,7 +3,7 @@ import * as Cause from "effect/Cause";
- import * as Effect from "effect/Effect";
- import * as Option from "effect/Option";
- import type { BrowserWindow } from "electron";
--import { beforeEach, vi } from "vite-plus/test";
+@@ -0,0 +1,86 @@
++import { assert, describe, it } from "@effect/vitest";
++import * as Effect from "effect/Effect";
++import * as Option from "effect/Option";
 +import { afterEach, beforeEach, vi } from "vite-plus/test";
- 
- import * as ElectronDialog from "./ElectronDialog.ts";
- 
-@@ -12,6 +12,9 @@ const { showMessageBoxMock, showOpenDialogMock, showErrorBoxMock } = vi.hoisted(
-   showOpenDialogMock: vi.fn(),
-   showErrorBoxMock: vi.fn(),
- }));
-+const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn() }));
++
++import * as ElectronDialog from "./ElectronDialog.ts";
++
++const { showOpenDialogMock, execFileMock } = vi.hoisted(() => ({
++  showOpenDialogMock: vi.fn(),
++  execFileMock: vi.fn(),
++}));
 +
 +vi.mock("node:child_process", () => ({ execFile: execFileMock }));
- 
- vi.mock("electron", () => ({
-   dialog: {
-@@ -26,8 +29,69 @@ describe("ElectronDialog", () => {
-     showMessageBoxMock.mockReset();
-     showOpenDialogMock.mockReset();
-     showErrorBoxMock.mockReset();
++
++vi.mock("electron", () => ({
++  dialog: {
++    showOpenDialog: showOpenDialogMock,
++  },
++}));
++
++describe("ElectronDialog", () => {
++  beforeEach(() => {
++    showOpenDialogMock.mockReset();
 +    execFileMock.mockReset();
-   });
- 
++  });
++
 +  afterEach(() => vi.unstubAllEnvs());
 +
 +  it.effect("returns the host path for a Flatpak folder picker selection", () =>
@@ -87,12 +89,9 @@ index 2ed5a1f2f..aa1b59fde 100644
 +      assert.include((error.cause as Error).message, "could not resolve");
 +    }).pipe(Effect.provide(ElectronDialog.layer)),
 +  );
-+
-   it.effect("preserves folder picker request context and cause", () =>
-     Effect.gen(function* () {
-       const cause = new Error("folder picker failed");
++});
 diff --git a/apps/desktop/src/electron/ElectronDialog.ts b/apps/desktop/src/electron/ElectronDialog.ts
-index b48953f11..2e868e089 100644
+index b48953f117..2e868e0893 100644
 --- a/apps/desktop/src/electron/ElectronDialog.ts
 +++ b/apps/desktop/src/electron/ElectronDialog.ts
 @@ -1,3 +1,7 @@

@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-index 3adf74bf7..141319707 100644
+index 9d12ed5a07..fd0201b2ab 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-@@ -126,6 +126,21 @@ function runShellEnvironment(input: {
+@@ -118,6 +118,21 @@ function runShellEnvironment(input: {
  }
  
  describe("DesktopShellEnvironment", () => {
@@ -21,11 +21,11 @@ index 3adf74bf7..141319707 100644
 +    }).pipe(Effect.tap(() => Effect.sync(() => assert.equal(env.PATH, "/app/bin:/usr/bin"))));
 +  });
 +
-   // Explicit opt-in keeps real shell coverage independent of globally installed tools.
-   it.effect.runIf(process.env.T3_TEST_NU_PATH !== undefined)(
-     "hydrates the desktop through a renamed Nushell symlink with native export conversions",
+   it.effect("rejects PATH output from a failed shell and tries the next candidate", () =>
+     Effect.gen(function* () {
+       const env: NodeJS.ProcessEnv = { SHELL: "/bin/failing", PATH: "/usr/bin" };
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.ts b/apps/desktop/src/shell/DesktopShellEnvironment.ts
-index 3fdec7932..1182af006 100644
+index 3fdec79323..1182af0062 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.ts
 @@ -14,6 +14,7 @@ import * as Stream from "effect/Stream";
@@ -45,7 +45,7 @@ index 3fdec7932..1182af006 100644
      return installWindowsEnvironment(config);
    }
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index 94bfbe44c..9a069527d 100644
+index d2f24143fc..3bbff03927 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
 @@ -1,4 +1,4 @@
@@ -54,7 +54,7 @@ index 94bfbe44c..9a069527d 100644
  import { DESKTOP_UPDATE_RESTART_MARKER_FILE } from "@t3tools/contracts";
  import * as Cause from "effect/Cause";
  import * as Deferred from "effect/Deferred";
-@@ -22,6 +22,28 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
+@@ -21,6 +21,28 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
  import { flushCallbacks, makeHarness } from "./updatesTestHarness.ts";
  
  describe("DesktopUpdates", () => {
@@ -80,11 +80,11 @@ index 94bfbe44c..9a069527d 100644
 +    );
 +  });
 +
-   it("preserves complete causes for update poller and event failures", () => {
-     const cause = Cause.combine(
-       Cause.fail(new Error("updater failed")),
+   it.effect("updates Linux .deb installs and leaves other non-AppImage installs off", () =>
+     Effect.gen(function* () {
+       const linuxState = (packageType: string | undefined) =>
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index ae3c2588f..0c6557464 100644
+index ae3c2588fa..0c65574646 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
 @@ -1,3 +1,4 @@

@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index 9a069527d2..919619b47a 100644
+index 3bbff03927..5787c78380 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
-@@ -37,6 +37,11 @@ describe("DesktopUpdates", () => {
+@@ -36,6 +36,11 @@ describe("DesktopUpdates", () => {
        const result = yield* updates.check("manual");
        assert.isFalse(result.checked);
        assert.equal(harness.checkCount(), 0);
@@ -29,10 +29,10 @@ index 0c65574646..94737ae8f2 100644
        if (Option.isSome(activeAction)) {
          return yield* new DesktopUpdateActionInProgressError({
 diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
-index 16c6ff3fb8..ed66cdcb3b 100644
+index c733fae935..a890471f99 100644
 --- a/apps/web/src/components/settings/SettingsPanels.tsx
 +++ b/apps/web/src/components/settings/SettingsPanels.tsx
-@@ -295,6 +295,7 @@ function AboutVersionSection() {
+@@ -157,6 +157,7 @@ function AboutVersionSection() {
      if (
        !bridge ||
        typeof bridge.setUpdateChannel !== "function" ||
@@ -40,7 +40,7 @@ index 16c6ff3fb8..ed66cdcb3b 100644
        channel === selectedUpdateChannel
      ) {
        return;
-@@ -449,10 +450,15 @@ function AboutVersionSection() {
+@@ -311,10 +312,15 @@ function AboutVersionSection() {
        {hasDesktopBridge ? (
          <SettingsRow
            {...searchableSetting("update-track")}
@@ -57,7 +57,7 @@ index 16c6ff3fb8..ed66cdcb3b 100644
                onValueChange={(value) => {
                  handleUpdateChannelChange(value as DesktopUpdateChannel);
                }}
-@@ -461,7 +467,7 @@ function AboutVersionSection() {
+@@ -323,7 +329,7 @@ function AboutVersionSection() {
                  size="sm"
                  className="w-full sm:w-40"
                  aria-label="Update track"

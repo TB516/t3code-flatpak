@@ -3,11 +3,16 @@ buildsystem: simple
 cleanup:
   - "*"
 build-commands:
+  # pnpm 12 runs as a native binary that finds its bundled node-gyp in the `dist/` next to it.
   - mkdir -p /app/bin /app/lib/pnpm
-  - cp -a bin dist package.json LICENSE /app/lib/pnpm/
-  - ln -s ../lib/pnpm/bin/pnpm.mjs /app/bin/pnpm
-  - ln -s ../lib/pnpm/bin/pnpx.mjs /app/bin/pnpx
+  - cp -a dist package.json /app/lib/pnpm/
+  - install -m755 exe/pnpm /app/lib/pnpm/pnpm
+  - ln -s ../lib/pnpm/pnpm /app/bin/pnpm
 sources:
   - type: archive
-    url: https://registry.npmjs.org/pnpm/-/pnpm-11.10.0.tgz
-    sha256: 620b6605ea4f62fc56a6d0a98733f479071d0321e03e486b522c7e9a74617431
+    url: https://registry.npmjs.org/pnpm/-/pnpm-12.14.0.tgz
+    sha256: ea206e35474bf87be9564a85ca70ed1c8ebdc45da55aafb0a3bf09d1ba69b179
+  - type: archive
+    url: https://registry.npmjs.org/@pnpm/exe.linux-x64/-/exe.linux-x64-12.14.0.tgz
+    sha256: 1de98ed2e9621113b0887b06322b461efb9df73d913fc1d151039b10b7117a41
+    dest: exe
