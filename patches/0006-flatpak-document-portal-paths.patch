@@ -91,7 +91,7 @@ index 0000000000..a9675e5e6f
 +  );
 +});
 diff --git a/apps/desktop/src/electron/ElectronDialog.ts b/apps/desktop/src/electron/ElectronDialog.ts
-index b48953f117..2e868e0893 100644
+index 4f9ab12edd..655c9c3304 100644
 --- a/apps/desktop/src/electron/ElectronDialog.ts
 +++ b/apps/desktop/src/electron/ElectronDialog.ts
 @@ -1,3 +1,7 @@

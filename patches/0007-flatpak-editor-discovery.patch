@@ -1,8 +1,8 @@
 diff --git a/apps/server/src/process/externalLauncher.test.ts b/apps/server/src/process/externalLauncher.test.ts
-index 73ff1b067e..3bb0ff2dcb 100644
+index 1e816f31b7..8675248445 100644
 --- a/apps/server/src/process/externalLauncher.test.ts
 +++ b/apps/server/src/process/externalLauncher.test.ts
-@@ -183,6 +183,55 @@ it.effect("launches an installed editor with platform-safe arguments", () =>
+@@ -180,6 +180,55 @@ it.effect("launches an installed editor with platform-safe arguments", () =>
    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
  );
  
@@ -55,14 +55,14 @@ index 73ff1b067e..3bb0ff2dcb 100644
 +  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 +
- for (const {} of ["darwin", "linux"] as const) {
- }
- 
+ it.effect.skipIf(windowsHost)(
+   "reveals a WSL file in Windows File Explorer through its UNC path",
+   () =>
 diff --git a/apps/server/src/process/externalLauncher.ts b/apps/server/src/process/externalLauncher.ts
-index 1260f2e3fd..a04265ac20 100644
+index b8c0911a52..87e1049b58 100644
 --- a/apps/server/src/process/externalLauncher.ts
 +++ b/apps/server/src/process/externalLauncher.ts
-@@ -133,6 +133,67 @@ const CommandLookupEnvConfig = Config.all({
+@@ -125,6 +125,67 @@ const CommandLookupEnvConfig = Config.all({
  const readBrowserLaunchEnv = BrowserLaunchEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
  const readCommandLookupEnv = CommandLookupEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
  
@@ -130,7 +130,7 @@ index 1260f2e3fd..a04265ac20 100644
  function parseTargetPathAndPosition(target: string): Option.Option<TargetPathAndPosition> {
    const match = TARGET_WITH_POSITION_PATTERN.exec(target);
    if (!match?.[1] || !match[2]) {
-@@ -431,6 +492,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+@@ -406,6 +467,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
    FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
  > {
    const available: EditorId[] = [];
@@ -138,7 +138,7 @@ index 1260f2e3fd..a04265ac20 100644
  
    for (const editor of EDITORS) {
      if (editor.commands === null) {
-@@ -441,7 +503,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+@@ -416,7 +478,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
      }
  
      const command = yield* resolveEditorCommand(editor, env);
@@ -147,7 +147,7 @@ index 1260f2e3fd..a04265ac20 100644
        available.push(editor.id);
      }
    }
-@@ -520,8 +582,24 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
+@@ -485,8 +547,24 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
    }
  
    if (editorDef.commands) {

@@ -1,5 +1,5 @@
 diff --git a/apps/server/src/preview/PreviewBrowserHost.test.ts b/apps/server/src/preview/PreviewBrowserHost.test.ts
-index b0b52a9362..cf1f0ed6f5 100644
+index 2a90d000b2..86d4df32c1 100644
 --- a/apps/server/src/preview/PreviewBrowserHost.test.ts
 +++ b/apps/server/src/preview/PreviewBrowserHost.test.ts
 @@ -17,6 +17,8 @@ const LDD_IN_BARE_DEBIAN = `\tlinux-vdso.so.1 (0x00007ffd2d1f8000)
@@ -9,9 +9,9 @@ index b0b52a9362..cf1f0ed6f5 100644
 +const SANDBOX_ABORT =
 +  "[1005/163106.285700:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:129] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/";
  
- // What the real loader prints when the browser's `--version` cannot start it.
  const LOADER_ERROR =
-@@ -73,6 +75,21 @@ const diagnose = (input: {
+   "chrome-headless-shell: error while loading shared libraries: libglib-2.0.so.0: cannot open shared object file: No such file or directory";
+@@ -72,6 +74,21 @@ const diagnose = (input: {
  };
  
  describe("diagnoseLaunchFailure", () => {
@@ -34,10 +34,10 @@ index b0b52a9362..cf1f0ed6f5 100644
      Effect.gen(function* () {
        const { error } = yield* diagnose({
 diff --git a/apps/server/src/preview/PreviewBrowserHost.ts b/apps/server/src/preview/PreviewBrowserHost.ts
-index 179ba9a1d2..5fe4890e7b 100644
+index 896f51b308..f63666f380 100644
 --- a/apps/server/src/preview/PreviewBrowserHost.ts
 +++ b/apps/server/src/preview/PreviewBrowserHost.ts
-@@ -57,18 +57,24 @@ export const DEBIAN_PACKAGES: ReadonlyArray<ReadonlyArray<string>> = [
+@@ -51,18 +51,24 @@ export const DEBIAN_PACKAGES: ReadonlyArray<ReadonlyArray<string>> = [
  
  export class PreviewBrowserSandboxError extends Schema.TaggedError<PreviewBrowserSandboxError>()(
    "PreviewBrowserSandboxError",
@@ -64,7 +64,7 @@ index 179ba9a1d2..5fe4890e7b 100644
      return `This host is missing libraries T3's browser needs (${this.libraries.join(", ")}). Run \`${this.setupCommand}\` on the host to install them, then try again.`;
    }
  }
-@@ -97,7 +103,9 @@ export const diagnoseLaunchFailure = Effect.fn("PreviewBrowserHost.diagnoseLaunc
+@@ -91,7 +97,9 @@ export const diagnoseLaunchFailure = Effect.fn("PreviewBrowserHost.diagnoseLaunc
      readonly output: string;
      readonly setupCommand: string;
    }) {
@@ -76,10 +76,10 @@ index 179ba9a1d2..5fe4890e7b 100644
        // Playwright reports Chrome's refusal to sandbox as root as a sandbox failure too.
        return (yield* HostProcess.UserId) === 0
 diff --git a/apps/server/src/preview/ServerBrowser.ts b/apps/server/src/preview/ServerBrowser.ts
-index 5b386e5f07..891c19884d 100644
+index a2485b30e9..25a6c28cbc 100644
 --- a/apps/server/src/preview/ServerBrowser.ts
 +++ b/apps/server/src/preview/ServerBrowser.ts
-@@ -2457,7 +2457,9 @@ const make = Effect.gen(function* () {
+@@ -2441,7 +2441,9 @@ const make = Effect.gen(function* () {
      (yield* PreviewBrowserHost.sandboxBlocked)
    ) {
      yield* Effect.logWarning(
@@ -91,10 +91,10 @@ index 5b386e5f07..891c19884d 100644
    }
  
 diff --git a/apps/server/src/preview/ServerBrowserStream.test.ts b/apps/server/src/preview/ServerBrowserStream.test.ts
-index 6b2d24802d..7e98804be3 100644
+index d3f4781829..648fc3f2e1 100644
 --- a/apps/server/src/preview/ServerBrowserStream.test.ts
 +++ b/apps/server/src/preview/ServerBrowserStream.test.ts
-@@ -377,6 +377,17 @@ it.effect("passes uploaded files to the page's open picker and needs operate sco
+@@ -375,6 +375,17 @@ it.effect("passes uploaded files to the page's open picker and needs operate sco
  const decodeHostSetup = Schema.decodeUnknownEffect(Schema.fromJsonString(PreviewStreamHostSetup));
  
  it.effect.each([
@@ -112,7 +112,7 @@ index 6b2d24802d..7e98804be3 100644
    {
      error: new PreviewBrowserHost.PreviewBrowserSandboxError({
        setupCommand: "sudo t3 browser setup",
-@@ -390,7 +401,7 @@ it.effect.each([
+@@ -388,7 +399,7 @@ it.effect.each([
      }),
      need: "libraries",
    },
@@ -121,7 +121,7 @@ index 6b2d24802d..7e98804be3 100644
    Effect.gen(function* () {
      const browser = ServerBrowser.ServerBrowser.of({
        clearProfile: () => Effect.void,
-@@ -430,7 +441,7 @@ it.effect.each([
+@@ -428,7 +439,7 @@ it.effect.each([
      expect(code).toBe(PREVIEW_STREAM_HOST_SETUP_CLOSE_CODE);
      expect(yield* decodeHostSetup(reason)).toEqual({
        need,
@@ -131,10 +131,10 @@ index 6b2d24802d..7e98804be3 100644
    }).pipe(Effect.scoped),
  );
 diff --git a/apps/server/src/preview/ServerBrowserStream.ts b/apps/server/src/preview/ServerBrowserStream.ts
-index ad42eaf5d7..02f9dc27b2 100644
+index 83d4adde7e..f03bac8cad 100644
 --- a/apps/server/src/preview/ServerBrowserStream.ts
 +++ b/apps/server/src/preview/ServerBrowserStream.ts
-@@ -212,9 +212,9 @@ const makeHandler = Effect.fnUntraced(function* (browser: ServerBrowser.ServerBr
+@@ -213,9 +213,9 @@ const makeHandler = Effect.fnUntraced(function* (browser: ServerBrowser.ServerBr
  
  const hostSetup = (cause: unknown): PreviewStreamHostSetup | undefined =>
    isSandboxError(cause)
@@ -147,10 +147,10 @@ index ad42eaf5d7..02f9dc27b2 100644
  const isSandboxError = Schema.is(PreviewBrowserHost.PreviewBrowserSandboxError);
  const isLibrariesError = Schema.is(PreviewBrowserHost.PreviewBrowserLibrariesError);
 diff --git a/apps/web/src/browser/ServerBrowserSurface.tsx b/apps/web/src/browser/ServerBrowserSurface.tsx
-index c0de4f0d32..6769c49a03 100644
+index 45c84dba0e..cc4b8d77f4 100644
 --- a/apps/web/src/browser/ServerBrowserSurface.tsx
 +++ b/apps/web/src/browser/ServerBrowserSurface.tsx
-@@ -870,7 +870,9 @@ export function ServerBrowserSurface(props: {
+@@ -857,7 +857,9 @@ export function ServerBrowserSurface(props: {
            <p role="alert" className="max-w-sm text-sm text-muted-foreground">
              {previewStreamHostSetupMessage(hostSetup)}
            </p>
@@ -182,11 +182,11 @@ index b71fff335f..9d5ab790a2 100644
      : "This server's host is missing libraries its browser needs. Run this once on the host, then try again:";
 +};
 diff --git a/packages/contracts/src/preview.ts b/packages/contracts/src/preview.ts
-index 455663155c..793b30a9ff 100644
+index fb5432986b..f5b2d5f73a 100644
 --- a/packages/contracts/src/preview.ts
 +++ b/packages/contracts/src/preview.ts
-@@ -154,6 +154,7 @@ export type PreviewRuntime = typeof PreviewRuntime.Type;
-  */
+@@ -143,6 +143,7 @@ export type PreviewRuntime = typeof PreviewRuntime.Type;
+ /** JSON reason for preview stream close code 4503; must fit the 123-byte close-reason limit. */
  export const PreviewStreamHostSetup = Schema.Struct({
    need: Schema.Literals(["sandbox", "libraries"]),
 +  /** Empty when host setup must be done manually. */

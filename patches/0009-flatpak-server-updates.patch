@@ -1,5 +1,5 @@
 diff --git a/apps/server/src/cloud/selfUpdate.test.ts b/apps/server/src/cloud/selfUpdate.test.ts
-index 352c89d06f..8e41d7ca64 100644
+index b359726aaf..39c16845a5 100644
 --- a/apps/server/src/cloud/selfUpdate.test.ts
 +++ b/apps/server/src/cloud/selfUpdate.test.ts
 @@ -130,6 +130,28 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
@@ -32,7 +32,7 @@ index 352c89d06f..8e41d7ca64 100644
      Effect.gen(function* () {
        const events: string[] = [];
 diff --git a/apps/server/src/cloud/selfUpdate.ts b/apps/server/src/cloud/selfUpdate.ts
-index ef717c34bb..4f546a934c 100644
+index dca833d8e5..a7fe446474 100644
 --- a/apps/server/src/cloud/selfUpdate.ts
 +++ b/apps/server/src/cloud/selfUpdate.ts
 @@ -216,6 +216,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
@@ -55,19 +55,18 @@ index ef717c34bb..4f546a934c 100644
      if (capability === "desktop-managed") {
        if (desktopAppUpdate.available) {
          return yield* desktopAppUpdate.run(reportProgress);
-@@ -369,7 +375,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
-   return ServerSelfUpdate.of({
+@@ -370,6 +376,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
      update,
-     commitDesktopUpdate: (requestId, onHandoffAccepted) =>
--      desktopAppUpdate.commit(requestId, onHandoffAccepted),
-+      flatpakManaged
-+        ? Effect.fail(
+     commitDesktopUpdate: Effect.fn("ServerSelfUpdate.commitDesktopUpdate")(
+       function (requestId, onHandoffAccepted) {
++        if (flatpakManaged) {
++          return Effect.fail(
 +            failWith("Updates are managed by Flatpak. Update the Flatpak package on this machine."),
-+          )
-+        : desktopAppUpdate.commit(requestId, onHandoffAccepted),
-   });
- });
- 
++          );
++        }
+         return desktopAppUpdate.commit(requestId, onHandoffAccepted);
+       },
+     ),
 diff --git a/apps/server/src/environment/ServerEnvironment.test.ts b/apps/server/src/environment/ServerEnvironment.test.ts
 index 7cebccb2a1..8eb81cb64e 100644
 --- a/apps/server/src/environment/ServerEnvironment.test.ts
@@ -114,12 +113,12 @@ index 7cebccb2a1..8eb81cb64e 100644
            settledWorktreeCleanup: true,
            storageCleanupRun: true,
 diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index fbb5970560..6b1379d1f6 100644
+index 4678aff95b..2b936551bf 100644
 --- a/apps/server/src/environment/ServerEnvironment.ts
 +++ b/apps/server/src/environment/ServerEnvironment.ts
-@@ -202,8 +202,11 @@ export const make = Effect.gen(function* () {
-   // app and its bundled server ship in one artifact, so a present fd means the
-   // app speaks the requestDesktopUpdate protocol.
+@@ -200,8 +200,11 @@ export const make = Effect.gen(function* () {
+   const serverInstallation = serverSelfUpdate === null ? yield* resolveServerInstallation : null;
+   // Desktop and server ship together; a control fd guarantees requestDesktopUpdate support.
  
 +  const flatpakManaged = Boolean((yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER);
    const desktopAppUpdate =

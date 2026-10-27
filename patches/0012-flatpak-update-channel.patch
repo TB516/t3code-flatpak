@@ -15,10 +15,10 @@ index 3bbff03927..5787c78380 100644
        Effect.scoped,
        Effect.provide(harness.layer),
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index 0c65574646..94737ae8f2 100644
+index f3bed49938..987e7f0ffc 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
-@@ -1109,6 +1109,9 @@ export const make = Effect.gen(function* () {
+@@ -1100,6 +1100,9 @@ export const make = Effect.gen(function* () {
        nextChannel: DesktopUpdateChannel,
      ) {
        yield* Effect.annotateCurrentSpan({ channel: nextChannel });
@@ -29,7 +29,7 @@ index 0c65574646..94737ae8f2 100644
        if (Option.isSome(activeAction)) {
          return yield* new DesktopUpdateActionInProgressError({
 diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
-index c733fae935..a890471f99 100644
+index f8bb413849..115c146080 100644
 --- a/apps/web/src/components/settings/SettingsPanels.tsx
 +++ b/apps/web/src/components/settings/SettingsPanels.tsx
 @@ -157,6 +157,7 @@ function AboutVersionSection() {
