@@ -719,7 +719,7 @@ index 2b9abe89f2..3aa03a5c38 100644
 +    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 diff --git a/apps/server/src/cli/doctor.ts b/apps/server/src/cli/doctor.ts
-index f7afaf9e4d..fcd005d2d9 100644
+index f7afaf9e4d..a9a202abd9 100644
 --- a/apps/server/src/cli/doctor.ts
 +++ b/apps/server/src/cli/doctor.ts
 @@ -1,8 +1,10 @@
@@ -733,7 +733,7 @@ index f7afaf9e4d..fcd005d2d9 100644
  
  import * as BootService from "../cloud/bootService.ts";
  import * as DatabaseMaintenance from "../persistence/DatabaseMaintenance.ts";
-@@ -145,3 +147,40 @@ export const doctorCommand = Command.make("doctor", {
+@@ -145,3 +147,38 @@ export const doctorCommand = Command.make("doctor", {
      }),
    ),
  );
@@ -751,11 +751,9 @@ index f7afaf9e4d..fcd005d2d9 100644
 +  Command.withHandler((flags) =>
 +    Effect.gen(function* () {
 +      if (!(yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER) {
-+        return yield* Effect.fail(
-+          new CliError.UserError({
-+            cause: "This action is only available to the Flatpak desktop.",
-+          }),
-+        );
++        return yield* new CliError.UserError({
++          cause: "This action is only available to the Flatpak desktop.",
++        });
 +      }
 +      const config = yield* resolveCliAuthConfig(flags, yield* GlobalFlag.LogLevel);
 +      yield* Effect.gen(function* () {
