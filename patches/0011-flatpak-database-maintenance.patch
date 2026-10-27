@@ -258,10 +258,10 @@ index 0000000000..7799a47cea
 +);
 diff --git a/apps/desktop/src/app/DesktopDatabaseMaintenance.ts b/apps/desktop/src/app/DesktopDatabaseMaintenance.ts
 new file mode 100644
-index 0000000000..a407e26ed7
+index 0000000000..2b44350768
 --- /dev/null
 +++ b/apps/desktop/src/app/DesktopDatabaseMaintenance.ts
-@@ -0,0 +1,246 @@
+@@ -0,0 +1,241 @@
 +import * as Cause from "effect/Cause";
 +import * as Context from "effect/Context";
 +import * as Duration from "effect/Duration";
@@ -363,11 +363,9 @@ index 0000000000..a407e26ed7
 +          { concurrency: "unbounded" },
 +        );
 +        if (code !== 0) {
-+          return yield* Effect.fail(
-+            new DesktopDatabaseCleanupError({
-+              message: errors.trim() || output.trim() || "Database cleanup failed.",
-+            }),
-+          );
++          return yield* new DesktopDatabaseCleanupError({
++            message: errors.trim() || output.trim() || "Database cleanup failed.",
++          });
 +        }
 +        return output.trim();
 +      }),
@@ -378,8 +376,8 @@ index 0000000000..a407e26ed7
 +    return error instanceof Error ? error.message : String(error);
 +  };
 +
-+  const run = (input: { readonly reclaimSpace: boolean }) =>
-+    Effect.gen(function* () {
++  const run = Effect.fn("desktop.databaseMaintenance.run")(
++    function* (input: { readonly reclaimSpace: boolean }) {
 +      if (!supported || !runtime || (yield* Ref.get(state.quitting))) return;
 +      if (yield* Ref.getAndSet(busy, true)) return;
 +      yield* Effect.gen(function* () {
@@ -455,11 +453,9 @@ index 0000000000..a407e26ed7
 +          yield* primary.stop();
 +          const stopped = yield* primary.snapshot;
 +          if (Option.isSome(stopped.activePid)) {
-+            return yield* Effect.fail(
-+              new DesktopDatabaseCleanupError({
-+                message: "The local server did not stop. Database cleanup was not started.",
-+              }),
-+            );
++            return yield* new DesktopDatabaseCleanupError({
++              message: "The local server did not stop. Database cleanup was not started.",
++            });
 +          }
 +          return yield* runHostMaintenance([
 +            "--compact",
@@ -497,12 +493,11 @@ index 0000000000..a407e26ed7
 +          owner,
 +        );
 +      }).pipe(Effect.ensuring(Ref.set(busy, false)));
-+    }).pipe(
-+      Effect.catchCause((cause) =>
-+        dialog.showErrorBox("Database cleanup failed", errorMessage(cause)),
-+      ),
-+      Effect.withSpan("desktop.databaseMaintenance.run"),
-+    );
++    },
++    Effect.catchCause((cause) =>
++      dialog.showErrorBox("Database cleanup failed", errorMessage(cause)),
++    ),
++  );
 +
 +  return DesktopDatabaseMaintenance.of({ supported, legacyDatabaseBytes, run });
 +});
@@ -587,7 +582,7 @@ index 0000000000..00cb4b9191
 +  }),
 +});
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 3056ce1ea2..755abd68b2 100644
+index 9a3c327e6b..d735fbb5a3 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
 @@ -40,6 +40,7 @@ import * as DesktopAppIdentity from "./app/DesktopAppIdentity.ts";
@@ -598,7 +593,7 @@ index 3056ce1ea2..755abd68b2 100644
  import * as DesktopApplicationMenu from "./window/DesktopApplicationMenu.ts";
  import * as DesktopAssets from "./app/DesktopAssets.ts";
  import * as DesktopBackendConfiguration from "./backend/DesktopBackendConfiguration.ts";
-@@ -209,6 +210,7 @@ const layerDesktopApplication = Layer.mergeAll(
+@@ -208,6 +209,7 @@ const layerDesktopApplication = Layer.mergeAll(
    DesktopApplicationMenu.layer,
    DesktopLinuxUrlHandler.layer,
    DesktopCliCommand.layer,
@@ -607,10 +602,10 @@ index 3056ce1ea2..755abd68b2 100644
  ).pipe(
    Layer.provideMerge(layerDesktopSnapShot),
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index bffa02d9ca..495f2ce1b4 100644
+index 4d57b30e21..7ca18cf9bd 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
-@@ -271,6 +271,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+@@ -270,6 +270,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
    checkForUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_CHECK_CHANNEL),
    downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
    installUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL),
@@ -645,7 +640,7 @@ index 2f7c24536c..95fe9f964d 100644
        cloudEnabled ? connectCommand : connectUnavailableCommand,
      ]),
 diff --git a/apps/server/src/cli/doctor.test.ts b/apps/server/src/cli/doctor.test.ts
-index 5743763254..a29fecfdcc 100644
+index 2b9abe89f2..3aa03a5c38 100644
 --- a/apps/server/src/cli/doctor.test.ts
 +++ b/apps/server/src/cli/doctor.test.ts
 @@ -1,10 +1,21 @@
@@ -671,7 +666,7 @@ index 5743763254..a29fecfdcc 100644
  import { DatabaseMaintenance } from "../persistence/DatabaseMaintenance.ts";
  
  it.effect(
-@@ -55,3 +66,51 @@ it.effect(
+@@ -53,3 +64,51 @@ it.effect(
        assert.deepEqual(calls, ["pause", "compact", "resume"]);
      }),
  );
@@ -724,7 +719,7 @@ index 5743763254..a29fecfdcc 100644
 +    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 +);
 diff --git a/apps/server/src/cli/doctor.ts b/apps/server/src/cli/doctor.ts
-index 850e67daf5..d2a69f67be 100644
+index f7afaf9e4d..a9a202abd9 100644
 --- a/apps/server/src/cli/doctor.ts
 +++ b/apps/server/src/cli/doctor.ts
 @@ -1,8 +1,10 @@
@@ -738,7 +733,7 @@ index 850e67daf5..d2a69f67be 100644
  
  import * as BootService from "../cloud/bootService.ts";
  import * as DatabaseMaintenance from "../persistence/DatabaseMaintenance.ts";
-@@ -148,3 +150,40 @@ export const doctorCommand = Command.make("doctor", {
+@@ -145,3 +147,38 @@ export const doctorCommand = Command.make("doctor", {
      }),
    ),
  );
@@ -756,11 +751,9 @@ index 850e67daf5..d2a69f67be 100644
 +  Command.withHandler((flags) =>
 +    Effect.gen(function* () {
 +      if (!(yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER) {
-+        return yield* Effect.fail(
-+          new CliError.UserError({
-+            cause: "This action is only available to the Flatpak desktop.",
-+          }),
-+        );
++        return yield* new CliError.UserError({
++          cause: "This action is only available to the Flatpak desktop.",
++        });
 +      }
 +      const config = yield* resolveCliAuthConfig(flags, yield* GlobalFlag.LogLevel);
 +      yield* Effect.gen(function* () {
@@ -916,10 +909,10 @@ index 08ccf816a9..fa8f1d484c 100644
          <SettingsRow
            key={environmentId}
 diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
-index d1f6b34939..4ad42778ce 100644
+index b353eca721..bae7b26f66 100644
 --- a/packages/contracts/src/ipc.ts
 +++ b/packages/contracts/src/ipc.ts
-@@ -1135,6 +1135,13 @@ export interface DesktopBridge {
+@@ -1108,6 +1108,13 @@ export interface DesktopBridge {
    downloadUpdate: () => Promise<DesktopUpdateActionResult>;
    installUpdate: () => Promise<DesktopUpdateActionResult>;
    onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;

@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/app/DesktopConfig.ts b/apps/desktop/src/app/DesktopConfig.ts
-index 773ea24509..8eb05c265a 100644
+index 11f975a6b8..586db466b6 100644
 --- a/apps/desktop/src/app/DesktopConfig.ts
 +++ b/apps/desktop/src/app/DesktopConfig.ts
 @@ -37,6 +37,7 @@ export const DesktopConfig = Config.all({
@@ -11,7 +11,7 @@ index 773ea24509..8eb05c265a 100644
    devServerUrl: Config.URL("VITE_DEV_SERVER_URL").pipe(Config.option),
    appUserModelIdOverride: trimmedString("T3CODE_DESKTOP_APP_USER_MODEL_ID"),
 diff --git a/apps/desktop/src/app/DesktopEarlyElectronStartup.ts b/apps/desktop/src/app/DesktopEarlyElectronStartup.ts
-index 0015e64267..9c792f7ed3 100644
+index 00a355bf49..e3d56b16c4 100644
 --- a/apps/desktop/src/app/DesktopEarlyElectronStartup.ts
 +++ b/apps/desktop/src/app/DesktopEarlyElectronStartup.ts
 @@ -1,3 +1,5 @@
@@ -20,7 +20,7 @@ index 0015e64267..9c792f7ed3 100644
  import { fromLenientJson } from "@t3tools/shared/schemaJson";
  import * as Option from "effect/Option";
  import * as Schema from "effect/Schema";
-@@ -149,10 +151,11 @@ export function resolveEarlyLinuxElectronOptions(
+@@ -144,10 +146,11 @@ export function resolveEarlyLinuxElectronOptions(
  ): EarlyLinuxElectronOptions {
    const preference = resolveEarlyLinuxPasswordStorePreference(input);
    const isDevelopment = isDevelopmentEnvironment(input.env);
@@ -58,10 +58,10 @@ index 200745f111..2b9aa94ef0 100644
      Effect.gen(function* () {
        const environment = yield* makeEnvironment({
 diff --git a/apps/desktop/src/app/DesktopEnvironment.ts b/apps/desktop/src/app/DesktopEnvironment.ts
-index ecf08255fe..04934beb7c 100644
+index 1066198b8f..6f42471060 100644
 --- a/apps/desktop/src/app/DesktopEnvironment.ts
 +++ b/apps/desktop/src/app/DesktopEnvironment.ts
-@@ -167,10 +167,14 @@ const make = Effect.fn("desktop.environment.make")(function* (
+@@ -168,10 +168,14 @@ const make = Effect.fn("desktop.environment.make")(function* (
      input.isPackaged && input.platform === "win32"
        ? path.join(input.resourcesPath, "server.asar")
        : appRoot;
@@ -77,7 +77,7 @@ index ecf08255fe..04934beb7c 100644
    const displayName = branding.displayName;
    const stateDir = resolveDesktopStateDir({
      baseDir,
-@@ -230,8 +234,10 @@ const make = Effect.fn("desktop.environment.make")(function* (
+@@ -231,8 +235,10 @@ const make = Effect.fn("desktop.environment.make")(function* (
      appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () =>
        isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code",
      ),
@@ -88,10 +88,10 @@ index ecf08255fe..04934beb7c 100644
 +      : resolveLinuxDesktopEntryName(isDevelopment),
 +    linuxWmClass: flatpakId ?? (isDevelopment ? "t3code-dev" : "t3code"),
      linuxApplicationsDir,
+     desktopLauncherPath: config.desktopLauncherPath,
      appImagePath: config.appImagePath,
-     defaultDesktopSettings: DesktopAppSettings.resolveDefaultDesktopSettings(input.appVersion),
 diff --git a/apps/desktop/src/app/DesktopLinuxUrlHandler.test.ts b/apps/desktop/src/app/DesktopLinuxUrlHandler.test.ts
-index 854f43c562..9fcc128aac 100644
+index feedbbd580..3772f241ed 100644
 --- a/apps/desktop/src/app/DesktopLinuxUrlHandler.test.ts
 +++ b/apps/desktop/src/app/DesktopLinuxUrlHandler.test.ts
 @@ -1,5 +1,5 @@
@@ -101,7 +101,7 @@ index 854f43c562..9fcc128aac 100644
  import * as Deferred from "effect/Deferred";
  import * as Effect from "effect/Effect";
  import * as FileSystem from "effect/FileSystem";
-@@ -157,6 +157,15 @@ const emptyRecording = (): RecordedRegistration => ({
+@@ -158,6 +158,15 @@ const emptyRecording = (): RecordedRegistration => ({
  });
  
  describe("DesktopLinuxUrlHandler", () => {
@@ -118,7 +118,7 @@ index 854f43c562..9fcc128aac 100644
      const entry = DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
        displayName: "T3 Code (Nightly)",
 diff --git a/apps/desktop/src/app/DesktopLinuxUrlHandler.ts b/apps/desktop/src/app/DesktopLinuxUrlHandler.ts
-index e03418964e..bf2c12f4ef 100644
+index dd38acbc38..80d3f12195 100644
 --- a/apps/desktop/src/app/DesktopLinuxUrlHandler.ts
 +++ b/apps/desktop/src/app/DesktopLinuxUrlHandler.ts
 @@ -9,6 +9,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
@@ -129,7 +129,7 @@ index e03418964e..bf2c12f4ef 100644
  import * as DesktopEnvironment from "./DesktopEnvironment.ts";
  import { makeComponentLogger } from "./DesktopObservability.ts";
  
-@@ -292,7 +293,10 @@ export const make = Effect.gen(function* () {
+@@ -285,7 +286,10 @@ export const make = Effect.gen(function* () {
    );
  
    const register = Effect.gen(function* () {
@@ -142,7 +142,7 @@ index e03418964e..bf2c12f4ef 100644
      }
      yield* writeDesktopEntry;
 diff --git a/apps/desktop/src/app/DesktopPreReadyPlatform.test.ts b/apps/desktop/src/app/DesktopPreReadyPlatform.test.ts
-index 143a6e5fd8..bf37ac682c 100644
+index f2b176ee37..72a944f961 100644
 --- a/apps/desktop/src/app/DesktopPreReadyPlatform.test.ts
 +++ b/apps/desktop/src/app/DesktopPreReadyPlatform.test.ts
 @@ -60,6 +60,28 @@ vi.mock("node:child_process", () => ({
@@ -175,7 +175,7 @@ index 143a6e5fd8..bf37ac682c 100644
      appendSwitchMock.mockReset();
      getSwitchValueMock.mockReset();
 diff --git a/apps/desktop/src/app/DesktopPreReadyPlatform.ts b/apps/desktop/src/app/DesktopPreReadyPlatform.ts
-index 58670439a5..902fec4675 100644
+index 8bef7366e3..920599c521 100644
 --- a/apps/desktop/src/app/DesktopPreReadyPlatform.ts
 +++ b/apps/desktop/src/app/DesktopPreReadyPlatform.ts
 @@ -9,6 +9,7 @@ import * as Layer from "effect/Layer";
@@ -186,7 +186,7 @@ index 58670439a5..902fec4675 100644
  import * as DesktopEarlyElectronStartup from "./DesktopEarlyElectronStartup.ts";
  import { resolveDesktopAppBranding } from "./DesktopEnvironment.ts";
  import { renderUrlHandlerDesktopEntry } from "./DesktopLinuxUrlHandler.ts";
-@@ -75,47 +76,49 @@ export const make = Effect.gen(function* () {
+@@ -75,50 +76,52 @@ export const make = Effect.gen(function* () {
        });
        // The portal also requires a valid desktop entry. An AppImage update may
        // have removed the executable referenced by the previous launch's entry.
@@ -224,7 +224,10 @@ index 58670439a5..902fec4675 100644
 -              isDevelopment: linux.isDevelopment,
 -              appVersion: Electron.app.getVersion(),
 -            }).displayName,
--            execTarget: process.env.APPIMAGE?.trim() || process.execPath,
+-            execTarget:
+-              process.env.T3CODE_DESKTOP_LAUNCHER_PATH?.trim() ||
+-              process.env.APPIMAGE?.trim() ||
+-              process.execPath,
 -            scheme: ElectronProtocol.getDesktopScheme(linux.isDevelopment),
 -            ...(iconPath === undefined ? {} : { iconPath }),
 -          }),
@@ -266,7 +269,10 @@ index 58670439a5..902fec4675 100644
 +                isDevelopment: linux.isDevelopment,
 +                appVersion: Electron.app.getVersion(),
 +              }).displayName,
-+              execTarget: process.env.APPIMAGE?.trim() || process.execPath,
++              execTarget:
++                process.env.T3CODE_DESKTOP_LAUNCHER_PATH?.trim() ||
++                process.env.APPIMAGE?.trim() ||
++                process.execPath,
 +              scheme: ElectronProtocol.getDesktopScheme(linux.isDevelopment),
 +              ...(iconPath === undefined ? {} : { iconPath }),
 +            }),
@@ -274,9 +280,9 @@ index 58670439a5..902fec4675 100644
 +          );
 +        } catch {}
 +      }
-       // Chromium caches its portal registration during startup. Set the identity
-       // before any asynchronous work can initialize it with Electron's default.
+       // Chromium caches portal identity; set it before any asynchronous initialization.
        Electron.app.setDesktopName(linux.linuxDesktopEntryName);
+       Electron.app.commandLine.appendSwitch("class", linux.linuxWmClass);
 diff --git a/apps/desktop/src/app/Flatpak.ts b/apps/desktop/src/app/Flatpak.ts
 new file mode 100644
 index 0000000000..006f94e000

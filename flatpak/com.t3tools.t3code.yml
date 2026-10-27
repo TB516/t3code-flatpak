@@ -24,6 +24,18 @@ finish-args:
   - --filesystem=~/.ssh/config:ro
   - --filesystem=~/.ssh/config.d:ro
   - --filesystem=~/.ssh/known_hosts:ro
+  # Read host browser profiles for upstream cookie import.
+  - --filesystem=~/.config/google-chrome:ro
+  - --filesystem=~/.config/microsoft-edge:ro
+  - --filesystem=~/.config/BraveSoftware/Brave-Browser:ro
+  - --filesystem=~/.config/vivaldi:ro
+  - --filesystem=~/.config/opera:ro
+  - --filesystem=~/.config/net.imput.helium:ro
+  - --filesystem=~/.mozilla/firefox:ro
+  - --filesystem=~/snap/firefox/common/.mozilla/firefox:ro
+  - --filesystem=~/.config/zen:ro
+  - --filesystem=~/.zen:ro
+  - --filesystem=~/.var/app/app.zen_browser.zen/zen:ro
 
 modules:
   - modules/imagemagick.yml
