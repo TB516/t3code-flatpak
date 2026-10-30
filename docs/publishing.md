@@ -30,8 +30,9 @@ Flatpak build sandbox cannot see.
 
 The **Publish Flatpak repository** workflow builds and signs the stable x86_64
 package, then deploys it to `https://t3code.thomasberrios.com` with GitHub
-Pages. It runs the package's tests and typechecks before publishing, and starts
-only when manually triggered from the Actions tab.
+Pages. It runs the package's tests and typechecks before publishing. It starts
+when packaging or website changes reach `main`, such as a merged update PR,
+and can also be started from the Actions tab.
 
 Keep **Settings → Pages → Source** set to **GitHub Actions**. The workflow
 uploads the website and Flatpak repository together as a Pages artifact.

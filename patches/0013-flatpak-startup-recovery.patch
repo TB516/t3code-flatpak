@@ -1,0 +1,79 @@
+diff --git a/apps/desktop/src/app/DesktopStartupRecovery.ts b/apps/desktop/src/app/DesktopStartupRecovery.ts
+index 4d2dbcfb14..3723bedeaf 100644
+--- a/apps/desktop/src/app/DesktopStartupRecovery.ts
++++ b/apps/desktop/src/app/DesktopStartupRecovery.ts
+@@ -17,6 +17,7 @@ import type { BackendStartupFailure } from "../backend/DesktopBackendManager.ts"
+ import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+ import * as DesktopObservability from "./DesktopObservability.ts";
+ import * as DesktopState from "./DesktopState.ts";
++import { flatpakAppId } from "./Flatpak.ts";
+ 
+ const RELEASES_URL = "https://github.com/pingdotgg/t3code/releases";
+ const LAST_STARTED_VERSION_FILE = "desktop-last-started-version";
+@@ -74,7 +75,25 @@ const escapeHtml = (value: string) =>
+ const actionLink = (action: StartupRecoveryAction, label: string, primary = false) =>
+   `<a class="button${primary ? " primary" : ""}" href="${ACTION_ORIGIN}/${action}">${escapeHtml(label)}</a>`;
+ 
+-function describeOffer(offer: StartupRecoveryOffer): { text: string; action: string } {
++function describeOffer(
++  offer: StartupRecoveryOffer,
++  flatpakId: string | null,
++): { text: string; action: string; commands?: string } {
++  // Flatpak owns installs, so its users need Flatpak commands instead of GitHub downloads.
++  if (flatpakId !== null && offer._tag === "Reinstall") {
++    return {
++      text: `Version ${offer.version} started correctly on this computer. To go back to it, find its commit by date, then install that commit:`,
++      action: "",
++      commands: `flatpak remote-info --log t3code ${flatpakId}\nflatpak update --commit=<commit> ${flatpakId}`,
++    };
++  }
++  if (flatpakId !== null && offer._tag === "Releases") {
++    return {
++      text: "Update T3 Code from your software store, or run:",
++      action: "",
++      commands: `flatpak update ${flatpakId}`,
++    };
++  }
+   switch (offer._tag) {
+     case "Checking":
+       return { text: "Checking for a newer version…", action: "" };
+@@ -106,8 +125,9 @@ function buildStartupRecoveryHtml(input: {
+   readonly failure: BackendStartupFailure;
+   readonly offer: StartupRecoveryOffer;
+   readonly logDir: string;
++  readonly flatpakId: string | null;
+ }): string {
+-  const offer = describeOffer(input.offer);
++  const offer = describeOffer(input.offer, input.flatpakId);
+   const output = input.failure.output.trim();
+   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>T3 Code could not start</title><style>
+ :root{color-scheme:light dark;--bg:#fff;--fg:#111;--muted:#666;--line:#ddd;--code:#f4f4f4}
+@@ -119,10 +139,12 @@ h1{font-size:18px;margin:0}p{margin:0}.muted{color:var(--muted)}
+ .button{color:var(--fg);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:6px 12px}
+ .button.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+ pre{flex:1;min-height:60px;margin:0;overflow:auto;background:var(--code);border:1px solid var(--line);border-radius:6px;padding:10px;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
++pre.commands{flex:none;min-height:0}
+ </style></head><body>
+ <h1>T3 Code could not start</h1>
+ <p>${escapeHtml(input.failure.reason)}</p>
+ <p>${escapeHtml(offer.text)}</p>
++${offer.commands === undefined ? "" : `<pre class="commands">${escapeHtml(offer.commands)}</pre>`}
+ <div class="actions">${offer.action}${actionLink("copy", "Copy details")}${actionLink("quit", "Quit")}</div>
+ <pre>${escapeHtml(output.length > 0 ? output : "The server wrote no output.")}</pre>
+ <p class="muted">Version ${escapeHtml(input.appVersion)}. T3 Code tries again in the background. Logs: ${escapeHtml(input.logDir)}</p>
+@@ -151,6 +173,7 @@ export const listen: Effect.Effect<
+   const electronTheme = yield* ElectronTheme.ElectronTheme;
+   const electronWindow = yield* ElectronWindow.ElectronWindow;
+   const fileSystem = yield* FileSystem.FileSystem;
++  const flatpakId = flatpakAppId(process.env, environment.platform);
+   const runFork = Effect.runForkWith(yield* Effect.context<never>());
+ 
+   const lastStartedVersionPath = environment.path.join(
+@@ -183,6 +206,7 @@ export const listen: Effect.Effect<
+       failure: failure.value,
+       offer: yield* offer,
+       logDir: environment.logDir,
++      flatpakId,
+     });
+     if ((yield* Ref.getAndSet(renderedHtmlRef, html)) === html) return;
+     void window.value.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);

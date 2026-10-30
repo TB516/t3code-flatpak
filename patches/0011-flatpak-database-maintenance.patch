@@ -504,10 +504,10 @@ index 0000000000..2b44350768
 +
 +export const layer = Layer.effect(DesktopDatabaseMaintenance, make);
 diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-index 2d67aa56e6..d1dfb09afe 100644
+index 35333ac3d3..051feb95ec 100644
 --- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
 +++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-@@ -84,6 +84,12 @@ import {
+@@ -79,6 +79,12 @@ import {
    uninstallCliCommand,
  } from "./methods/cliCommand.ts";
  
@@ -520,7 +520,7 @@ index 2d67aa56e6..d1dfb09afe 100644
  export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
    const ipc = yield* DesktopIpc.DesktopIpc;
    yield* installNotificationBadge();
-@@ -93,6 +99,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+@@ -88,6 +94,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
    yield* ipc.handle(AppActivationIpc.complete);
    yield* ipc.handle(WebLinksIpc.setReady);
  
@@ -531,10 +531,10 @@ index 2d67aa56e6..d1dfb09afe 100644
    yield* ipc.handle(completeLegacyLocalStorage);
    yield* ipc.handleSync(getAppBranding);
 diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
-index 9b11a2283a..ab6a56e583 100644
+index bba4f6449b..f979ef1405 100644
 --- a/apps/desktop/src/ipc/channels.ts
 +++ b/apps/desktop/src/ipc/channels.ts
-@@ -125,3 +125,7 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
+@@ -122,3 +122,7 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
  export const CANCEL_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:cancel-provider-auth-callback";
  export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-storage";
  export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
@@ -602,13 +602,13 @@ index 9a3c327e6b..d735fbb5a3 100644
  ).pipe(
    Layer.provideMerge(layerDesktopSnapShot),
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index 4d57b30e21..7ca18cf9bd 100644
+index 965b7db5d6..b0886be90f 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
-@@ -270,6 +270,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
-   checkForUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_CHECK_CHANNEL),
+@@ -267,6 +267,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
    downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
-   installUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL),
+   installUpdate: (expectedVersion) =>
+     ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL, expectedVersion),
 +  ...(ipcRenderer.sendSync(IpcChannels.DATABASE_MAINTENANCE_SUPPORTED_CHANNEL) === true
 +    ? {
 +        databaseMaintenance: {
@@ -622,7 +622,7 @@ index 4d57b30e21..7ca18cf9bd 100644
      getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
      install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
 diff --git a/apps/server/src/binCli.ts b/apps/server/src/binCli.ts
-index 2f7c24536c..95fe9f964d 100644
+index b26b4fd9f0..b21ed274a7 100644
 --- a/apps/server/src/binCli.ts
 +++ b/apps/server/src/binCli.ts
 @@ -1,4 +1,4 @@
@@ -631,7 +631,7 @@ index 2f7c24536c..95fe9f964d 100644
  import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
  import * as NodeServices from "@effect/platform-node/NodeServices";
  import * as Effect from "effect/Effect";
-@@ -89,6 +89,7 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
+@@ -91,6 +91,7 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
        themeCommand,
        traceCommand,
        doctorCommand,
@@ -909,12 +909,12 @@ index 08ccf816a9..fa8f1d484c 100644
          <SettingsRow
            key={environmentId}
 diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
-index b353eca721..bae7b26f66 100644
+index f460619f11..4a691fa6e4 100644
 --- a/packages/contracts/src/ipc.ts
 +++ b/packages/contracts/src/ipc.ts
-@@ -1108,6 +1108,13 @@ export interface DesktopBridge {
-   downloadUpdate: () => Promise<DesktopUpdateActionResult>;
-   installUpdate: () => Promise<DesktopUpdateActionResult>;
+@@ -1115,6 +1115,13 @@ export interface DesktopBridge {
+   /** With a version, installs only that downloaded build. */
+   installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
    onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
 +  /** The `t3 doctor` database repairs for this Flatpak desktop's local database. */
 +  databaseMaintenance?: {
@@ -923,6 +923,6 @@ index b353eca721..bae7b26f66 100644
 +    /** Confirms, then reclaims space (restarting the server) and/or deletes the legacy database. */
 +    run: (input: { reclaimSpace: boolean }) => Promise<void>;
 +  };
-   cliCommand?: {
+   cliCommand: {
      getState: () => Promise<DesktopCliCommandState>;
      install: () => Promise<DesktopCliCommandState>;

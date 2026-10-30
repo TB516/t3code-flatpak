@@ -1,8 +1,8 @@
 diff --git a/apps/server/src/cloud/selfUpdate.test.ts b/apps/server/src/cloud/selfUpdate.test.ts
-index b359726aaf..39c16845a5 100644
+index 1e3157adff..8117d2298b 100644
 --- a/apps/server/src/cloud/selfUpdate.test.ts
 +++ b/apps/server/src/cloud/selfUpdate.test.ts
-@@ -130,6 +130,28 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
+@@ -128,6 +128,28 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
  });
  
  it.layer(NodeServices.layer)("server self update", (it) => {
@@ -28,14 +28,14 @@ index b359726aaf..39c16845a5 100644
 +    }).pipe(Effect.scoped),
 +  );
 +
-   it.effect("marks running threads at the boot-service handoff", () =>
+   // regression: #5181 make remote updates rollback-safe
+   it.effect("rejects invalid versions and desktop-managed servers before staging", () =>
      Effect.gen(function* () {
-       const events: string[] = [];
 diff --git a/apps/server/src/cloud/selfUpdate.ts b/apps/server/src/cloud/selfUpdate.ts
-index dca833d8e5..a7fe446474 100644
+index d72c5e9218..242983807b 100644
 --- a/apps/server/src/cloud/selfUpdate.ts
 +++ b/apps/server/src/cloud/selfUpdate.ts
-@@ -216,6 +216,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+@@ -128,6 +128,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
      yield* Config.String(CLI_RELEASE_BASE_URL_ENV).pipe(Config.option),
    );
    const inFlight = yield* Ref.make(false);
@@ -43,7 +43,7 @@ index dca833d8e5..a7fe446474 100644
  
    yield* pruneRuntimesOnStart({ baseDir: serverConfig.baseDir, managed: launcher.managed }).pipe(
      Effect.forkScoped,
-@@ -231,6 +232,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+@@ -151,6 +152,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
    const update: ServerSelfUpdate["Service"]["update"] = Effect.fn(
      "cloud.server_self_update.update",
    )(function* (input, reportProgress = () => Effect.void, onHandoffAccepted = () => Effect.void) {
@@ -53,9 +53,9 @@ index dca833d8e5..a7fe446474 100644
 +      );
 +    }
      if (capability === "desktop-managed") {
-       if (desktopAppUpdate.available) {
-         return yield* desktopAppUpdate.run(reportProgress);
-@@ -370,6 +376,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+       const unsafeCrossing = input.channel === undefined ? null : crossesTrackUnsafely(input);
+       if (unsafeCrossing !== null) return yield* failWith(unsafeCrossing);
+@@ -299,6 +305,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
      update,
      commitDesktopUpdate: Effect.fn("ServerSelfUpdate.commitDesktopUpdate")(
        function (requestId, onHandoffAccepted) {
@@ -113,10 +113,10 @@ index 7cebccb2a1..8eb81cb64e 100644
            settledWorktreeCleanup: true,
            storageCleanupRun: true,
 diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index 4678aff95b..2b936551bf 100644
+index cef18fbe32..bd245de9c8 100644
 --- a/apps/server/src/environment/ServerEnvironment.ts
 +++ b/apps/server/src/environment/ServerEnvironment.ts
-@@ -200,8 +200,11 @@ export const make = Effect.gen(function* () {
+@@ -201,8 +201,11 @@ export const make = Effect.gen(function* () {
    const serverInstallation = serverSelfUpdate === null ? yield* resolveServerInstallation : null;
    // Desktop and server ship together; a control fd guarantees requestDesktopUpdate support.
  
@@ -127,5 +127,5 @@ index 4678aff95b..2b936551bf 100644
 +    serverSelfUpdate === "desktop-managed" &&
 +    serverConfig.desktopTelemetryControlFd !== undefined;
  
+   const databaseMigration = databaseMigrationHead(serverConfig.dbPath);
    const descriptor: ExecutionEnvironmentDescriptor = {
-     environmentId,
