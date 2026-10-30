@@ -81,6 +81,7 @@ sources:
       - ../../patches/0010-flatpak-browser-requirements.patch
       - ../../patches/0011-flatpak-database-maintenance.patch
       - ../../patches/0012-flatpak-update-channel.patch
+      - ../../patches/0013-flatpak-startup-recovery.patch
     use-git: true
   - type: dir
     path: ../package
