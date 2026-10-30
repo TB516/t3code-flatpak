@@ -76,10 +76,10 @@ index 896f51b308..f63666f380 100644
        // Playwright reports Chrome's refusal to sandbox as root as a sandbox failure too.
        return (yield* HostProcess.UserId) === 0
 diff --git a/apps/server/src/preview/ServerBrowser.ts b/apps/server/src/preview/ServerBrowser.ts
-index a2485b30e9..25a6c28cbc 100644
+index 78097b761c..3613056db0 100644
 --- a/apps/server/src/preview/ServerBrowser.ts
 +++ b/apps/server/src/preview/ServerBrowser.ts
-@@ -2441,7 +2441,9 @@ const make = Effect.gen(function* () {
+@@ -2449,7 +2449,9 @@ const make = Effect.gen(function* () {
      (yield* PreviewBrowserHost.sandboxBlocked)
    ) {
      yield* Effect.logWarning(
@@ -131,10 +131,10 @@ index d3f4781829..648fc3f2e1 100644
    }).pipe(Effect.scoped),
  );
 diff --git a/apps/server/src/preview/ServerBrowserStream.ts b/apps/server/src/preview/ServerBrowserStream.ts
-index 83d4adde7e..f03bac8cad 100644
+index 8d8164cd91..8c398f83be 100644
 --- a/apps/server/src/preview/ServerBrowserStream.ts
 +++ b/apps/server/src/preview/ServerBrowserStream.ts
-@@ -213,9 +213,9 @@ const makeHandler = Effect.fnUntraced(function* (browser: ServerBrowser.ServerBr
+@@ -212,9 +212,9 @@ const makeHandler = Effect.fnUntraced(function* (browser: ServerBrowser.ServerBr
  
  const hostSetup = (cause: unknown): PreviewStreamHostSetup | undefined =>
    isSandboxError(cause)
@@ -147,10 +147,10 @@ index 83d4adde7e..f03bac8cad 100644
  const isSandboxError = Schema.is(PreviewBrowserHost.PreviewBrowserSandboxError);
  const isLibrariesError = Schema.is(PreviewBrowserHost.PreviewBrowserLibrariesError);
 diff --git a/apps/web/src/browser/ServerBrowserSurface.tsx b/apps/web/src/browser/ServerBrowserSurface.tsx
-index 45c84dba0e..cc4b8d77f4 100644
+index c6ad2f51c3..7824f8342e 100644
 --- a/apps/web/src/browser/ServerBrowserSurface.tsx
 +++ b/apps/web/src/browser/ServerBrowserSurface.tsx
-@@ -857,7 +857,9 @@ export function ServerBrowserSurface(props: {
+@@ -861,7 +861,9 @@ export function ServerBrowserSurface(props: {
            <p role="alert" className="max-w-sm text-sm text-muted-foreground">
              {previewStreamHostSetupMessage(hostSetup)}
            </p>
@@ -182,7 +182,7 @@ index b71fff335f..9d5ab790a2 100644
      : "This server's host is missing libraries its browser needs. Run this once on the host, then try again:";
 +};
 diff --git a/packages/contracts/src/preview.ts b/packages/contracts/src/preview.ts
-index fb5432986b..f5b2d5f73a 100644
+index cbf8ac60b2..b329300905 100644
 --- a/packages/contracts/src/preview.ts
 +++ b/packages/contracts/src/preview.ts
 @@ -143,6 +143,7 @@ export type PreviewRuntime = typeof PreviewRuntime.Type;

@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index 3bbff03927..5787c78380 100644
+index 37d6276a4a..41e97af472 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
-@@ -36,6 +36,11 @@ describe("DesktopUpdates", () => {
+@@ -37,6 +37,11 @@ describe("DesktopUpdates", () => {
        const result = yield* updates.check("manual");
        assert.isFalse(result.checked);
        assert.equal(harness.checkCount(), 0);
@@ -15,54 +15,46 @@ index 3bbff03927..5787c78380 100644
        Effect.scoped,
        Effect.provide(harness.layer),
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index f3bed49938..987e7f0ffc 100644
+index f72a430e39..b08e7dada1 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
-@@ -1100,6 +1100,9 @@ export const make = Effect.gen(function* () {
-       nextChannel: DesktopUpdateChannel,
+@@ -1145,6 +1145,9 @@ export const make = Effect.gen(function* () {
+       options?: { readonly minimumVersion?: string | undefined },
      ) {
        yield* Effect.annotateCurrentSpan({ channel: nextChannel });
 +      if (flatpakAppId(process.env, environment.platform) !== null) {
 +        return yield* Ref.get(updateStateRef);
 +      }
-       const activeAction = yield* tryStartChannelChange;
-       if (Option.isSome(activeAction)) {
-         return yield* new DesktopUpdateActionInProgressError({
+       // A background check holds the updater only briefly, so wait it out instead of refusing.
+       const activeAction = yield* tryStartChannelChange.pipe(
+         Effect.repeat({
 diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
-index f8bb413849..115c146080 100644
+index c4e3d27a07..0f1a6a50f8 100644
 --- a/apps/web/src/components/settings/SettingsPanels.tsx
 +++ b/apps/web/src/components/settings/SettingsPanels.tsx
-@@ -157,6 +157,7 @@ function AboutVersionSection() {
-     if (
-       !bridge ||
-       typeof bridge.setUpdateChannel !== "function" ||
-+      updateState?.enabled !== true ||
-       channel === selectedUpdateChannel
-     ) {
-       return;
-@@ -311,10 +312,15 @@ function AboutVersionSection() {
-       {hasDesktopBridge ? (
-         <SettingsRow
-           {...searchableSetting("update-track")}
--          description="Use stable releases or nightly builds. Switch back anytime."
-+          description={
-+            updateState?.enabled === false
-+              ? (updateState.message ?? "Updates are unavailable.")
-+              : "Use stable releases or nightly builds. Switch back anytime."
-+          }
+@@ -334,6 +334,8 @@ function AboutVersionSection() {
+                   Review
+                 </Button>
+               </>
++            ) : updateState?.enabled === false ? (
++              (updateState.message ?? "Updates are unavailable.")
+             ) : (
+               "Switches this app and every connected machine whose database the target release supports."
+             )
+@@ -341,6 +343,7 @@ function AboutVersionSection() {
            control={
              <Select
                value={selectedUpdateChannel}
-+              disabled={isChangingUpdateChannel || updateState?.enabled !== true}
++              disabled={switchChannel !== null || updateRun !== null || updateState?.enabled !== true}
                onValueChange={(value) => {
-                 handleUpdateChannelChange(value as DesktopUpdateChannel);
-               }}
-@@ -323,7 +329,7 @@ function AboutVersionSection() {
+                 if (value !== selectedUpdateChannel) {
+                   setSwitchChannel(value as DesktopUpdateChannel);
+@@ -351,7 +354,7 @@ function AboutVersionSection() {
                  size="sm"
                  className="w-full sm:w-40"
                  aria-label="Update track"
--                disabled={isChangingUpdateChannel}
-+                disabled={isChangingUpdateChannel || updateState?.enabled !== true}
+-                disabled={switchChannel !== null || updateRun !== null}
++                disabled={switchChannel !== null || updateRun !== null || updateState?.enabled !== true}
                >
-                 <SelectValue>
-                   {selectedUpdateChannel === "nightly" ? "Nightly" : "Stable"}
+                 <SelectValue>{channelSwitchLabel(selectedUpdateChannel)}</SelectValue>
+               </SelectTrigger>
