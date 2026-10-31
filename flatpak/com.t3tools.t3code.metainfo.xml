@@ -19,6 +19,12 @@
   <launchable type="desktop-id">com.t3tools.t3code.desktop</launchable>
   <url type="homepage">https://t3.codes</url>
   <releases>
+    <release version="0.1.6-1" date="2026-10-31">
+      <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.6</url>
+      <description>
+        <p>Preview tab downloads now finish and save to your Downloads folder.</p>
+      </description>
+    </release>
     <release version="0.1.6" date="2026-10-31">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.6</url>
       <description>
