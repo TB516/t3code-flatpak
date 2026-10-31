@@ -21,7 +21,12 @@
   <releases>
     <release version="0.1.6" date="2026-10-31">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.6</url>
-      <description></description>
+      <description>
+        <p>Update to T3 Code 0.1.6.</p>
+        <p>Preview tab downloads now reach your Downloads folder, and Tailscale
+        HTTPS addresses appear in Settings. Dropped folders and chosen project icons
+        now use their real host paths.</p>
+      </description>
     </release>
     <release version="0.1.5" date="2026-10-29">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.5</url>

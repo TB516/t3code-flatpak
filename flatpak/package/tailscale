@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+: "${FLATPAK_ID:?This Tailscale launcher must run inside Flatpak}"
+
+# Settings reads the tailnet name from the host's Tailscale CLI. flatpak-spawn
+# finds commands with the host service's small PATH, so sh uses the user's PATH.
+set -- /bin/sh -c 'exec tailscale "$@"' tailscale "$@"
+if [ -n "${T3CODE_FLATPAK_HOST_PATH:-}" ]; then
+    set -- "--env=PATH=$T3CODE_FLATPAK_HOST_PATH" "$@"
+fi
+
+exec /usr/bin/flatpak-spawn --host --watch-bus --directory=/ "$@"

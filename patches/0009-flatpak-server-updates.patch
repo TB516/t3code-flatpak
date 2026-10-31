@@ -113,7 +113,7 @@ index 7cebccb2a1..8eb81cb64e 100644
            settledWorktreeCleanup: true,
            storageCleanupRun: true,
 diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index cef18fbe32..bd245de9c8 100644
+index 72d7f0c2de..1b5c18675b 100644
 --- a/apps/server/src/environment/ServerEnvironment.ts
 +++ b/apps/server/src/environment/ServerEnvironment.ts
 @@ -201,8 +201,11 @@ export const make = Effect.gen(function* () {

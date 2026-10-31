@@ -36,5 +36,9 @@ The Flatpak can read `~/.ssh/config`, `~/.ssh/config.d`, and
 `~/.ssh/known_hosts` to populate its connection list, while private keys stay
 outside the sandbox.
 
+Preview tab downloads save to your Downloads folder. On KDE, T3 Code stores its
+secrets in KWallet. If Tailscale is installed on the host, Settings shows its
+HTTPS address.
+
 For local builds, see [Building](docs/building.md). Maintainers can find update
 and release instructions in [Publishing](docs/publishing.md).

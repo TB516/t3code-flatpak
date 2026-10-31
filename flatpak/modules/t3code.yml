@@ -2,11 +2,11 @@ name: t3code
 buildsystem: simple
 run-tests: true
 build-options:
-  append-path: /app/bin:/usr/lib/sdk/node24/bin:/usr/lib/sdk/rust-stable/bin
+  append-path: /app/bin:/usr/lib/sdk/node26/bin:/usr/lib/sdk/rust-stable/bin
   build-args:
     - --share=network
   env:
-    npm_config_nodedir: /usr/lib/sdk/node24
+    npm_config_nodedir: /usr/lib/sdk/node26
     # Version stamping must not trigger an automatic install after the frozen install.
     pnpm_config_verify_deps_before_run: 'false'
 build-commands:
@@ -25,6 +25,7 @@ build-commands:
   - install -m755 flatpak-package/host-server.sh flatpak-package/ssh-askpass /app/t3code/
   - install -Dm755 flatpak-package/t3code /app/bin/t3code
   - install -Dm755 flatpak-package/ssh /app/bin/ssh
+  - install -Dm755 flatpak-package/tailscale /app/bin/tailscale
   - install -Dm644 flatpak-package/com.t3tools.t3code.desktop /app/share/applications/com.t3tools.t3code.desktop
   - install -Dm644 flatpak-package/com.t3tools.t3code.metainfo.xml /app/share/metainfo/com.t3tools.t3code.metainfo.xml
   - |
@@ -73,7 +74,6 @@ sources:
       - ../../patches/0001-flatpak-desktop-integration.patch
       - ../../patches/0002-flatpak-host-backend.patch
       - ../../patches/0003-flatpak-host-environment.patch
-      - ../../patches/0005-flatpak-build-artifact.patch
       - ../../patches/0006-flatpak-document-portal-paths.patch
       - ../../patches/0007-flatpak-editor-discovery.patch
       - ../../patches/0008-flatpak-cli-launcher.patch

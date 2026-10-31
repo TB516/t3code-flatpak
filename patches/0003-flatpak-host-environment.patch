@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-index 9d12ed5a07..fd0201b2ab 100644
+index 4804823069..609a1432bd 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 @@ -118,6 +118,21 @@ function runShellEnvironment(input: {
@@ -25,7 +25,7 @@ index 9d12ed5a07..fd0201b2ab 100644
      Effect.gen(function* () {
        const env: NodeJS.ProcessEnv = { SHELL: "/bin/failing", PATH: "/usr/bin" };
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.ts b/apps/desktop/src/shell/DesktopShellEnvironment.ts
-index 25c37ecefc..d4070ffc31 100644
+index 6e0fdbd380..365313b48d 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.ts
 @@ -14,6 +14,7 @@ import * as Stream from "effect/Stream";
@@ -36,7 +36,7 @@ index 25c37ecefc..d4070ffc31 100644
  import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
  
  type EnvironmentPatch = Record<string, string>;
-@@ -501,6 +502,7 @@ const installShellEnvironment = (
+@@ -503,6 +504,7 @@ const installShellEnvironment = (
    never,
    ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
  > => {
