@@ -26,6 +26,8 @@ finish-args:
   - --talk-name=org.kde.kwalletd6
   # Preview tab downloads otherwise land in the sandbox's temporary home.
   - --filesystem=xdg-download
+  # The host server hands the sandboxed browser a /tmp path for preview downloads.
+  - --filesystem=/tmp
   - --filesystem=~/.ssh/config:ro
   - --filesystem=~/.ssh/config.d:ro
   - --filesystem=~/.ssh/known_hosts:ro
