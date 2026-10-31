@@ -29,10 +29,10 @@ index f72a430e39..b08e7dada1 100644
        const activeAction = yield* tryStartChannelChange.pipe(
          Effect.repeat({
 diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
-index c4e3d27a07..0f1a6a50f8 100644
+index dca3eabc86..fe17e9e378 100644
 --- a/apps/web/src/components/settings/SettingsPanels.tsx
 +++ b/apps/web/src/components/settings/SettingsPanels.tsx
-@@ -334,6 +334,8 @@ function AboutVersionSection() {
+@@ -326,6 +326,8 @@ function AboutVersionSection() {
                    Review
                  </Button>
                </>
@@ -41,7 +41,7 @@ index c4e3d27a07..0f1a6a50f8 100644
              ) : (
                "Switches this app and every connected machine whose database the target release supports."
              )
-@@ -341,6 +343,7 @@ function AboutVersionSection() {
+@@ -333,6 +335,7 @@ function AboutVersionSection() {
            control={
              <Select
                value={selectedUpdateChannel}
@@ -49,7 +49,7 @@ index c4e3d27a07..0f1a6a50f8 100644
                onValueChange={(value) => {
                  if (value !== selectedUpdateChannel) {
                    setSwitchChannel(value as DesktopUpdateChannel);
-@@ -351,7 +354,7 @@ function AboutVersionSection() {
+@@ -343,7 +346,7 @@ function AboutVersionSection() {
                  size="sm"
                  className="w-full sm:w-40"
                  aria-label="Update track"

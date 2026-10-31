@@ -1,9 +1,9 @@
 diff --git a/apps/desktop/src/electron/ElectronDialog.test.ts b/apps/desktop/src/electron/ElectronDialog.test.ts
 new file mode 100644
-index 0000000000..a9675e5e6f
+index 0000000000..8ae86ba2fa
 --- /dev/null
 +++ b/apps/desktop/src/electron/ElectronDialog.test.ts
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,94 @@
 +import { assert, describe, it } from "@effect/vitest";
 +import * as Effect from "effect/Effect";
 +import * as Option from "effect/Option";
@@ -16,7 +16,7 @@ index 0000000000..a9675e5e6f
 +  execFileMock: vi.fn(),
 +}));
 +
-+vi.mock("node:child_process", () => ({ execFile: execFileMock }));
++vi.mock("node:child_process", () => ({ execFileSync: execFileMock }));
 +
 +vi.mock("electron", () => ({
 +  dialog: {
@@ -40,10 +40,10 @@ index 0000000000..a9675e5e6f
 +        canceled: false,
 +        filePaths: ["/run/user/1000/doc/document-id/packslip-packages"],
 +      });
-+      execFileMock.mockImplementation((...args: unknown[]) => {
-+        const callback = args.at(-1) as (error: null, stdout: string, stderr: string) => void;
-+        callback(null, "id: document-id\norigin: /home/alice/Projects/packslip-packages\n", "");
-+      });
++      vi.stubEnv("T3CODE_FLATPAK_HOST_PATH", "/home/alice/.nix-profile/bin:/usr/bin");
++      execFileMock.mockReturnValue(
++        "id: document-id\norigin: /home/alice/Projects/packslip-packages\n",
++      );
 +      const dialog = yield* ElectronDialog.ElectronDialog;
 +
 +      const path = yield* dialog.pickFolder({
@@ -58,13 +58,24 @@ index 0000000000..a9675e5e6f
 +          "--host",
 +          "--directory=/",
 +          "--env=LC_ALL=C",
-+          "/usr/bin/flatpak",
-+          "document-info",
++          "--env=PATH=/home/alice/.nix-profile/bin:/usr/bin",
++          "/bin/sh",
++          "-c",
++          'exec flatpak document-info "$1"',
++          "sh",
 +          "/run/user/1000/doc/document-id/packslip-packages",
 +        ],
 +      ]);
 +    }).pipe(Effect.provide(ElectronDialog.layer)),
 +  );
++
++  it("leaves ordinary paths alone without asking the host", () => {
++    vi.stubEnv("FLATPAK_ID", "com.t3tools.t3code");
++    vi.stubEnv("XDG_RUNTIME_DIR", "/run/user/1000");
++
++    assert.equal(ElectronDialog.resolveHostPath("/home/alice/project"), "/home/alice/project");
++    assert.equal(execFileMock.mock.calls.length, 0);
++  });
 +
 +  it.effect("reports an unresolved Flatpak folder through the typed picker error", () =>
 +    Effect.gen(function* () {
@@ -74,10 +85,7 @@ index 0000000000..a9675e5e6f
 +        canceled: false,
 +        filePaths: ["/run/user/1000/doc/document-id/project"],
 +      });
-+      execFileMock.mockImplementation((...args: unknown[]) => {
-+        const callback = args.at(-1) as (error: null, stdout: string, stderr: string) => void;
-+        callback(null, "id: document-id\n", "");
-+      });
++      execFileMock.mockReturnValue("id: document-id\n");
 +      const dialog = yield* ElectronDialog.ElectronDialog;
 +
 +      const error = yield* Effect.flip(
@@ -91,77 +99,68 @@ index 0000000000..a9675e5e6f
 +  );
 +});
 diff --git a/apps/desktop/src/electron/ElectronDialog.ts b/apps/desktop/src/electron/ElectronDialog.ts
-index 4f9ab12edd..655c9c3304 100644
+index 4f9ab12edd..30db8e3217 100644
 --- a/apps/desktop/src/electron/ElectronDialog.ts
 +++ b/apps/desktop/src/electron/ElectronDialog.ts
 @@ -1,3 +1,7 @@
-+// @effect-diagnostics nodeBuiltinImport:off globalErrorInEffectCatch:off globalErrorInEffectFailure:off -- This native bridge wraps its errors at the public boundary.
-+import { execFile } from "node:child_process";
++// @effect-diagnostics nodeBuiltinImport:off -- This native bridge wraps its errors at the public boundary.
++import { execFileSync } from "node:child_process";
 +import * as NodePath from "node:path";
 +
  import * as Context from "effect/Context";
  import * as Effect from "effect/Effect";
  import * as Layer from "effect/Layer";
-@@ -6,6 +10,58 @@ import * as Schema from "effect/Schema";
+@@ -6,6 +10,49 @@ import * as Schema from "effect/Schema";
  
  import * as Electron from "electron";
  
 +import { flatpakAppId } from "../app/Flatpak.ts";
 +
-+/** The folder picker can return a document portal path, but the server runs on the host. */
-+const resolveHostFolderPath = Effect.fn("desktop.electron.dialog.resolveHostFolderPath")(function* (
-+  folderPath: string,
-+) {
++/**
++ * Pickers and drops can return a document portal path, but the server runs on the host.
++ * The host service's PATH is small, so sh finds `flatpak` with the user's captured PATH.
++ */
++export function resolveHostPath(path: string): string {
 +  const runtimeDir = process.env.XDG_RUNTIME_DIR;
 +  if (
 +    flatpakAppId(process.env, process.platform) === null ||
 +    !runtimeDir ||
-+    !folderPath.startsWith(`${runtimeDir}/doc/`)
++    !path.startsWith(`${runtimeDir}/doc/`)
 +  ) {
-+    return folderPath;
++    return path;
 +  }
 +
-+  const stdout = yield* Effect.tryPromise({
-+    try: () =>
-+      new Promise<string>((resolve, reject) => {
-+        execFile(
-+          "/usr/bin/flatpak-spawn",
-+          [
-+            "--host",
-+            "--directory=/",
-+            "--env=LC_ALL=C",
-+            "/usr/bin/flatpak",
-+            "document-info",
-+            folderPath,
-+          ],
-+          (error, stdout) => {
-+            if (error) {
-+              reject(error);
-+              return;
-+            }
-+            resolve(stdout);
-+          },
-+        );
-+      }),
-+    catch: (cause) => new Error("Flatpak could not query the selected folder.", { cause }),
-+  });
++  const hostPath = process.env.T3CODE_FLATPAK_HOST_PATH;
++  const stdout = execFileSync(
++    "/usr/bin/flatpak-spawn",
++    [
++      "--host",
++      "--directory=/",
++      "--env=LC_ALL=C",
++      ...(hostPath ? [`--env=PATH=${hostPath}`] : []),
++      "/bin/sh",
++      "-c",
++      'exec flatpak document-info "$1"',
++      "sh",
++      path,
++    ],
++    { encoding: "utf8", timeout: 2000, stdio: ["ignore", "pipe", "ignore"] },
++  );
 +  const origin = stdout
 +    .split("\n")
 +    .find((line) => line.startsWith("origin: "))
 +    ?.slice("origin: ".length)
 +    .replace(/\r$/, "");
 +  if (!origin || !NodePath.isAbsolute(origin)) {
-+    return yield* Effect.fail(
-+      new Error("Flatpak could not resolve the selected folder to a host path."),
-+    );
++    throw new Error("Flatpak could not resolve the selected path to a host path.");
 +  }
 +  return origin;
-+});
++}
 +
  export class ElectronDialogPickFolderError extends Schema.TaggedError<ElectronDialogPickFolderError>()(
    "ElectronDialogPickFolderError",
    {
-@@ -138,7 +194,21 @@ export const make = ElectronDialog.of({
+@@ -138,7 +185,20 @@ export const make = ElectronDialog.of({
      if (result.canceled) {
        return Option.none();
      }
@@ -170,17 +169,133 @@ index 4f9ab12edd..655c9c3304 100644
 +    if (!folderPath) {
 +      return Option.none();
 +    }
-+    const hostPath = yield* resolveHostFolderPath(folderPath).pipe(
-+      Effect.mapError(
-+        (cause) =>
-+          new ElectronDialogPickFolderError({
-+            ownerWindowId,
-+            defaultPath,
-+            cause,
-+          }),
-+      ),
-+    );
++    const hostPath = yield* Effect.try({
++      try: () => resolveHostPath(folderPath),
++      catch: (cause) =>
++        new ElectronDialogPickFolderError({
++          ownerWindowId,
++          defaultPath,
++          cause,
++        }),
++    });
 +    return Option.some(hostPath);
    }),
    pickFiles: Effect.fn("desktop.electron.dialog.pickFiles")(function* (input) {
      const ownerWindowId = Option.match(input.owner, {
+diff --git a/apps/desktop/src/ipc/DesktopIpc.ts b/apps/desktop/src/ipc/DesktopIpc.ts
+index 354acc5a81..64f54412fa 100644
+--- a/apps/desktop/src/ipc/DesktopIpc.ts
++++ b/apps/desktop/src/ipc/DesktopIpc.ts
+@@ -17,7 +17,7 @@ export type DesktopIpcHandleListener = (
+   raw: unknown,
+ ) => unknown | Promise<unknown>;
+ 
+-export type DesktopIpcSyncListener = (event: DesktopIpcSyncEvent) => void;
++export type DesktopIpcSyncListener = (event: DesktopIpcSyncEvent, payload: unknown) => void;
+ 
+ export interface DesktopIpcMain {
+   removeHandler(channel: string): void;
+@@ -65,7 +65,7 @@ export interface DesktopIpcMethod<E, R> {
+ 
+ export interface DesktopSyncIpcMethod<E, R> {
+   readonly channel: string;
+-  readonly handler: () => Effect.Effect<unknown, E, R>;
++  readonly handler: (payload?: unknown) => Effect.Effect<unknown, E, R>;
+ }
+ 
+ export class DesktopIpc extends Context.Service<
+@@ -127,11 +127,11 @@ export const make = (ipcMain: DesktopIpcMain): DesktopIpc["Service"] =>
+         Effect.try({
+           try: () => {
+             ipcMain.removeAllListeners(channel);
+-            ipcMain.on(channel, (event) => {
++            ipcMain.on(channel, (event, payload) => {
+               event.returnValue = runSync(
+                 Effect.gen(function* () {
+                   yield* Effect.annotateCurrentSpan({ channel });
+-                  return yield* handler();
++                  return yield* handler(payload);
+                 }).pipe(
+                   Effect.annotateLogs({ channel }),
+                   Effect.withSpan("desktop.ipc.invokeSync"),
+diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
+index 35333ac3d3..98001d96f3 100644
+--- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
++++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
+@@ -47,6 +47,7 @@ import {
+   revealWindow,
+   pickFolder,
+   pickProjectFavicon,
++  resolveHostPath,
+   pickThemeFiles,
+   setTheme,
+   showContextMenu,
+@@ -93,6 +94,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+   yield* ipc.handleSync(getAppBranding);
+   yield* ipc.handleSync(getRelayTelemetryEnabled);
+   yield* ipc.handleSync(getSystemLocale);
++  yield* ipc.handleSync(resolveHostPath);
+   yield* ipc.handleSync(getWindowFullscreenState);
+   yield* ipc.handleSync(getLocalEnvironmentBootstraps);
+   yield* ipc.handleSync(getLocalEnvironmentEnabled);
+diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
+index 538dd06b0b..c2bb874846 100644
+--- a/apps/desktop/src/ipc/channels.ts
++++ b/apps/desktop/src/ipc/channels.ts
+@@ -1,6 +1,7 @@
+ export const PICK_FOLDER_CHANNEL = "desktop:pick-folder";
+ export const SET_NOTIFICATION_BADGE_CHANNEL = "desktop:set-notification-badge";
+ export const PICK_PROJECT_FAVICON_CHANNEL = "desktop:pick-project-favicon";
++export const RESOLVE_HOST_PATH_CHANNEL = "desktop:resolve-host-path";
+ export const PICK_THEME_FILES_CHANNEL = "desktop:pick-theme-files";
+ export const SET_THEME_CHANNEL = "desktop:set-theme";
+ export const CONTEXT_MENU_CHANNEL = "desktop:context-menu";
+diff --git a/apps/desktop/src/ipc/methods/window.ts b/apps/desktop/src/ipc/methods/window.ts
+index f0d661b58b..95a4cc779a 100644
+--- a/apps/desktop/src/ipc/methods/window.ts
++++ b/apps/desktop/src/ipc/methods/window.ts
+@@ -250,10 +250,24 @@ export const pickProjectFavicon = DesktopIpc.makeIpcMethod({
+         },
+       ],
+     });
+-    return paths[0] ?? null;
++    const iconPath = paths[0];
++    if (!iconPath) return null;
++    return yield* Effect.try(() => ElectronDialog.resolveHostPath(iconPath)).pipe(
++      Effect.orElseSucceed(() => iconPath),
++    );
+   }),
+ });
+ 
++/** Drops resolve synchronously so the composer inserts into the thread that received them. */
++export const resolveHostPath: DesktopIpc.DesktopSyncIpcMethod<never, never> = {
++  channel: IpcChannels.RESOLVE_HOST_PATH_CHANNEL,
++  handler: (path) =>
++    Schema.decodeUnknownEffect(Schema.String)(path).pipe(
++      Effect.flatMap((portalPath) => Effect.try(() => ElectronDialog.resolveHostPath(portalPath))),
++      Effect.orElseSucceed(() => ""),
++    ),
++};
++
+ export const setTheme = DesktopIpc.makeIpcMethod({
+   channel: IpcChannels.SET_THEME_CHANNEL,
+   payload: DesktopThemeSchema,
+diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
+index 950ed972c6..4d9e156341 100644
+--- a/apps/desktop/src/preload.ts
++++ b/apps/desktop/src/preload.ts
+@@ -82,7 +82,13 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+   },
+   getRelayTelemetryEnabled: () =>
+     ipcRenderer.sendSync(IpcChannels.GET_RELAY_TELEMETRY_ENABLED_CHANNEL) === true,
+-  getPathForFile: (file: File) => webUtils.getPathForFile(file),
++  getPathForFile: (file: File) => {
++    const path = webUtils.getPathForFile(file);
++    if (!path.includes("/doc/")) return path;
++    // Flatpak drops arrive as document portal paths, but the server runs on the host.
++    const hostPath: unknown = ipcRenderer.sendSync(IpcChannels.RESOLVE_HOST_PATH_CHANNEL, path);
++    return typeof hostPath === "string" ? hostPath : "";
++  },
+   getClientPlatform: () => clientPlatform,
+   setNotificationBadge: (badge) =>
+     ipcRenderer.invoke(IpcChannels.SET_NOTIFICATION_BADGE_CHANNEL, badge),

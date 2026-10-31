@@ -504,10 +504,10 @@ index 0000000000..2b44350768
 +
 +export const layer = Layer.effect(DesktopDatabaseMaintenance, make);
 diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-index 35333ac3d3..051feb95ec 100644
+index 98001d96f3..2dfed48350 100644
 --- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
 +++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-@@ -79,6 +79,12 @@ import {
+@@ -80,6 +80,12 @@ import {
    uninstallCliCommand,
  } from "./methods/cliCommand.ts";
  
@@ -520,7 +520,7 @@ index 35333ac3d3..051feb95ec 100644
  export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
    const ipc = yield* DesktopIpc.DesktopIpc;
    yield* installNotificationBadge();
-@@ -88,6 +94,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+@@ -89,6 +95,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
    yield* ipc.handle(AppActivationIpc.complete);
    yield* ipc.handle(WebLinksIpc.setReady);
  
@@ -531,10 +531,10 @@ index 35333ac3d3..051feb95ec 100644
    yield* ipc.handle(completeLegacyLocalStorage);
    yield* ipc.handleSync(getAppBranding);
 diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
-index bba4f6449b..f979ef1405 100644
+index c2bb874846..e182c5249f 100644
 --- a/apps/desktop/src/ipc/channels.ts
 +++ b/apps/desktop/src/ipc/channels.ts
-@@ -122,3 +122,7 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
+@@ -124,3 +124,7 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
  export const CANCEL_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:cancel-provider-auth-callback";
  export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-storage";
  export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
@@ -602,10 +602,10 @@ index 9a3c327e6b..d735fbb5a3 100644
  ).pipe(
    Layer.provideMerge(layerDesktopSnapShot),
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index 965b7db5d6..b0886be90f 100644
+index 4d9e156341..b8b8a9a62e 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
-@@ -267,6 +267,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+@@ -278,6 +278,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
    downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
    installUpdate: (expectedVersion) =>
      ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL, expectedVersion),
@@ -622,7 +622,7 @@ index 965b7db5d6..b0886be90f 100644
      getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
      install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
 diff --git a/apps/server/src/binCli.ts b/apps/server/src/binCli.ts
-index b26b4fd9f0..b21ed274a7 100644
+index 7c136ae532..1206d73e1d 100644
 --- a/apps/server/src/binCli.ts
 +++ b/apps/server/src/binCli.ts
 @@ -1,4 +1,4 @@
@@ -631,7 +631,7 @@ index b26b4fd9f0..b21ed274a7 100644
  import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
  import * as NodeServices from "@effect/platform-node/NodeServices";
  import * as Effect from "effect/Effect";
-@@ -91,6 +91,7 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
+@@ -95,6 +95,7 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
        themeCommand,
        traceCommand,
        doctorCommand,
@@ -909,10 +909,10 @@ index 08ccf816a9..fa8f1d484c 100644
          <SettingsRow
            key={environmentId}
 diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
-index f460619f11..4a691fa6e4 100644
+index f14452fec5..9585789455 100644
 --- a/packages/contracts/src/ipc.ts
 +++ b/packages/contracts/src/ipc.ts
-@@ -1115,6 +1115,13 @@ export interface DesktopBridge {
+@@ -1116,6 +1116,13 @@ export interface DesktopBridge {
    /** With a version, installs only that downloaded build. */
    installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
    onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;

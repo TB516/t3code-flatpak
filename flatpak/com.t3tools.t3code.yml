@@ -3,7 +3,7 @@ runtime: org.freedesktop.Platform
 runtime-version: "25.08"
 sdk: org.freedesktop.Sdk
 sdk-extensions:
-  - org.freedesktop.Sdk.Extension.node24
+  - org.freedesktop.Sdk.Extension.node26
   - org.freedesktop.Sdk.Extension.rust-stable
 base: org.electronjs.Electron2.BaseApp
 base-version: "25.08"
@@ -21,6 +21,11 @@ finish-args:
   - --unset-env=ELECTRON_RUN_AS_NODE
   - --talk-name=org.freedesktop.Flatpak
   - --talk-name=org.freedesktop.secrets
+  # Chromium stores secrets in KWallet on KDE.
+  - --talk-name=org.kde.kwalletd5
+  - --talk-name=org.kde.kwalletd6
+  # Preview tab downloads otherwise land in the sandbox's temporary home.
+  - --filesystem=xdg-download
   - --filesystem=~/.ssh/config:ro
   - --filesystem=~/.ssh/config.d:ro
   - --filesystem=~/.ssh/known_hosts:ro
