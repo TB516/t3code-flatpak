@@ -23,9 +23,9 @@
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.6</url>
       <description>
         <p>Update to T3 Code 0.1.6.</p>
-        <p>Preview tab downloads now reach your Downloads folder, and Tailscale
-        HTTPS addresses appear in Settings. Dropped folders and chosen project icons
-        now use their real host paths.</p>
+        <p>Preview tab downloads now reach your Downloads folder, and with Network
+        access on, Settings shows Tailscale HTTPS addresses. Dropped folders and
+        chosen project icons now use their real host paths.</p>
       </description>
     </release>
     <release version="0.1.5" date="2026-10-29">
