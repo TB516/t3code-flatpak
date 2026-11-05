@@ -1,3 +1,23 @@
+diff --git a/apps/desktop/src/app/DesktopApp.test.ts b/apps/desktop/src/app/DesktopApp.test.ts
+index 66fc83adae..b095321153 100644
+--- a/apps/desktop/src/app/DesktopApp.test.ts
++++ b/apps/desktop/src/app/DesktopApp.test.ts
+@@ -54,6 +54,7 @@ import * as DesktopBackendConfiguration from "../backend/DesktopBackendConfigura
+ import * as DesktopCliCommand from "./DesktopCliCommand.ts";
+ import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
+ import * as DesktopConnectionCatalogStore from "./DesktopConnectionCatalogStore.ts";
++import * as DesktopDatabaseMaintenance from "./DesktopDatabaseMaintenance.ts";
+ import * as DesktopIpc from "../ipc/DesktopIpc.ts";
+ import * as DesktopLocalEnvironmentAuth from "../backend/DesktopLocalEnvironmentAuth.ts";
+ import * as DesktopManagedPolicy from "./DesktopManagedPolicy.ts";
+@@ -193,6 +194,7 @@ it.effect(
+             Layer.mock(DesktopCliCommand.DesktopCliCommand, {}),
+             Layer.mock(DesktopClientSettings.DesktopClientSettings, {}),
+             Layer.mock(DesktopConnectionCatalogStore.DesktopConnectionCatalogStore, {}),
++            Layer.mock(DesktopDatabaseMaintenance.DesktopDatabaseMaintenance, { supported: false }),
+             Layer.mock(DesktopIpc.DesktopIpc, {}),
+             Layer.mock(DesktopLocalEnvironmentAuth.DesktopLocalEnvironmentAuth, {}),
+             Layer.mock(DesktopManagedPolicy.DesktopManagedPolicy, {}),
 diff --git a/apps/desktop/src/app/DesktopDatabaseMaintenance.test.ts b/apps/desktop/src/app/DesktopDatabaseMaintenance.test.ts
 new file mode 100644
 index 0000000000..7799a47cea
@@ -504,10 +524,10 @@ index 0000000000..2b44350768
 +
 +export const layer = Layer.effect(DesktopDatabaseMaintenance, make);
 diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-index 98001d96f3..2dfed48350 100644
+index 8be9e500a7..71e31275ed 100644
 --- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
 +++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-@@ -80,6 +80,12 @@ import {
+@@ -81,6 +81,12 @@ import {
    uninstallCliCommand,
  } from "./methods/cliCommand.ts";
  
@@ -520,7 +540,7 @@ index 98001d96f3..2dfed48350 100644
  export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
    const ipc = yield* DesktopIpc.DesktopIpc;
    yield* installNotificationBadge();
-@@ -89,6 +95,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+@@ -90,6 +96,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
    yield* ipc.handle(AppActivationIpc.complete);
    yield* ipc.handle(WebLinksIpc.setReady);
  
@@ -531,10 +551,10 @@ index 98001d96f3..2dfed48350 100644
    yield* ipc.handle(completeLegacyLocalStorage);
    yield* ipc.handleSync(getAppBranding);
 diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
-index c2bb874846..e182c5249f 100644
+index 9ca25157de..b425244c66 100644
 --- a/apps/desktop/src/ipc/channels.ts
 +++ b/apps/desktop/src/ipc/channels.ts
-@@ -124,3 +124,7 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
+@@ -125,3 +125,7 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
  export const CANCEL_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:cancel-provider-auth-callback";
  export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-storage";
  export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
@@ -582,10 +602,10 @@ index 0000000000..00cb4b9191
 +  }),
 +});
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 9a3c327e6b..d735fbb5a3 100644
+index d109518be1..9e4c7f3f36 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
-@@ -40,6 +40,7 @@ import * as DesktopAppIdentity from "./app/DesktopAppIdentity.ts";
+@@ -41,6 +41,7 @@ import * as DesktopAppIdentity from "./app/DesktopAppIdentity.ts";
  import * as DesktopConnectionCatalogStore from "./app/DesktopConnectionCatalogStore.ts";
  import * as DesktopClerk from "./app/DesktopClerk.ts";
  import * as DesktopCliCommand from "./app/DesktopCliCommand.ts";
@@ -593,7 +613,7 @@ index 9a3c327e6b..d735fbb5a3 100644
  import * as DesktopApplicationMenu from "./window/DesktopApplicationMenu.ts";
  import * as DesktopAssets from "./app/DesktopAssets.ts";
  import * as DesktopBackendConfiguration from "./backend/DesktopBackendConfiguration.ts";
-@@ -208,6 +209,7 @@ const layerDesktopApplication = Layer.mergeAll(
+@@ -212,6 +213,7 @@ const layerDesktopApplication = Layer.mergeAll(
    DesktopApplicationMenu.layer,
    DesktopLinuxUrlHandler.layer,
    DesktopCliCommand.layer,
@@ -602,10 +622,10 @@ index 9a3c327e6b..d735fbb5a3 100644
  ).pipe(
    Layer.provideMerge(layerDesktopSnapShot),
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index 4d9e156341..b8b8a9a62e 100644
+index 907b74c481..29b59ebedb 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
-@@ -278,6 +278,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+@@ -279,6 +279,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
    downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
    installUpdate: (expectedVersion) =>
      ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL, expectedVersion),
@@ -622,28 +642,28 @@ index 4d9e156341..b8b8a9a62e 100644
      getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
      install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
 diff --git a/apps/server/src/binCli.ts b/apps/server/src/binCli.ts
-index 7c136ae532..1206d73e1d 100644
+index 15a3a9321f..5b13325ec5 100644
 --- a/apps/server/src/binCli.ts
 +++ b/apps/server/src/binCli.ts
 @@ -1,4 +1,4 @@
 -import { doctorCommand } from "./cli/doctor.ts";
 +import { doctorCommand, flatpakDatabaseMaintenanceCommand } from "./cli/doctor.ts";
+ import { policyCommand } from "./cli/policy.ts";
  import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
- import * as NodeServices from "@effect/platform-node/NodeServices";
- import * as Effect from "effect/Effect";
-@@ -95,6 +95,7 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
-       themeCommand,
+ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+@@ -98,6 +98,7 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
        traceCommand,
        doctorCommand,
+       policyCommand,
 +      flatpakDatabaseMaintenanceCommand,
        triageCommand,
        cloudEnabled ? connectCommand : connectUnavailableCommand,
      ]),
 diff --git a/apps/server/src/cli/doctor.test.ts b/apps/server/src/cli/doctor.test.ts
-index 2b9abe89f2..3aa03a5c38 100644
+index 2b9abe89f2..23a2121dbd 100644
 --- a/apps/server/src/cli/doctor.test.ts
 +++ b/apps/server/src/cli/doctor.test.ts
-@@ -1,10 +1,21 @@
+@@ -1,10 +1,18 @@
  import * as NodeServices from "@effect/platform-node/NodeServices";
  import { assert, it } from "@effect/vitest";
  import * as Effect from "effect/Effect";
@@ -654,9 +674,6 @@ index 2b9abe89f2..3aa03a5c38 100644
 +import * as HostProcess from "@t3tools/shared/HostProcess";
 +import * as NetService from "@t3tools/shared/Net";
 +import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
-+import * as EventStore from "../orchestration-v2/EventStore.ts";
-+import * as ProjectionMaintenance from "../orchestration-v2/ProjectionMaintenance.ts";
-+import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 +import * as Sqlite from "../persistence/Sqlite.ts";
  import * as Layer from "effect/Layer";
  
@@ -666,7 +683,7 @@ index 2b9abe89f2..3aa03a5c38 100644
  import { DatabaseMaintenance } from "../persistence/DatabaseMaintenance.ts";
  
  it.effect(
-@@ -53,3 +64,51 @@ it.effect(
+@@ -53,3 +61,41 @@ it.effect(
        assert.deepEqual(calls, ["pause", "compact", "resume"]);
      }),
  );
@@ -680,17 +697,7 @@ index 2b9abe89f2..3aa03a5c38 100644
 +      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-flatpak-compact-" });
 +      const dbPath = path.join(baseDir, "userdata", "statev2.sqlite");
 +      const legacy = path.join(baseDir, "userdata", "state.sqlite");
-+      yield* Effect.flatMap(
-+        ProjectionMaintenance.ProjectionMaintenanceV2,
-+        (projections) => projections.rebuild,
-+      ).pipe(
-+        Effect.provide(
-+          ProjectionMaintenance.layer.pipe(
-+            Layer.provide(Layer.merge(EventStore.layer, ProjectionStore.layer)),
-+            Layer.provideMerge(Sqlite.layerFromPath(dbPath)),
-+          ),
-+        ),
-+      );
++      yield* Effect.void.pipe(Effect.provide(Sqlite.layerFromPath(dbPath)));
 +      yield* Effect.flatMap(SqlClient.SqlClient, (sql) => sql`CREATE TABLE rollback (id)`).pipe(
 +        Effect.provide(NodeSqliteClient.layer({ filename: legacy })),
 +      );
@@ -909,10 +916,10 @@ index 08ccf816a9..fa8f1d484c 100644
          <SettingsRow
            key={environmentId}
 diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
-index f14452fec5..9585789455 100644
+index 5aa9acf277..64b5519ad5 100644
 --- a/packages/contracts/src/ipc.ts
 +++ b/packages/contracts/src/ipc.ts
-@@ -1116,6 +1116,13 @@ export interface DesktopBridge {
+@@ -1129,6 +1129,13 @@ export interface DesktopBridge {
    /** With a version, installs only that downloaded build. */
    installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
    onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;

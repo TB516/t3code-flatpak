@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index 37d6276a4a..41e97af472 100644
+index cc2cc4c537..7e5bdf2ac7 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
-@@ -37,6 +37,11 @@ describe("DesktopUpdates", () => {
+@@ -38,6 +38,11 @@ describe("DesktopUpdates", () => {
        const result = yield* updates.check("manual");
        assert.isFalse(result.checked);
        assert.equal(harness.checkCount(), 0);
@@ -15,24 +15,24 @@ index 37d6276a4a..41e97af472 100644
        Effect.scoped,
        Effect.provide(harness.layer),
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index f72a430e39..b08e7dada1 100644
+index 637b0bc113..c8be030780 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
-@@ -1145,6 +1145,9 @@ export const make = Effect.gen(function* () {
+@@ -1202,6 +1202,9 @@ export const make = Effect.gen(function* () {
        options?: { readonly minimumVersion?: string | undefined },
      ) {
        yield* Effect.annotateCurrentSpan({ channel: nextChannel });
 +      if (flatpakAppId(process.env, environment.platform) !== null) {
 +        return yield* Ref.get(updateStateRef);
 +      }
-       // A background check holds the updater only briefly, so wait it out instead of refusing.
-       const activeAction = yield* tryStartChannelChange.pipe(
-         Effect.repeat({
+       if (Option.isSome(channelBlockedReason(nextChannel))) {
+         return yield* new DesktopUpdateChannelManagedError({
+           channel: nextChannel,
 diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
-index dca3eabc86..fe17e9e378 100644
+index 362210f96e..20e160eafd 100644
 --- a/apps/web/src/components/settings/SettingsPanels.tsx
 +++ b/apps/web/src/components/settings/SettingsPanels.tsx
-@@ -326,6 +326,8 @@ function AboutVersionSection() {
+@@ -347,6 +347,8 @@ function AboutVersionSection() {
                    Review
                  </Button>
                </>
@@ -41,7 +41,7 @@ index dca3eabc86..fe17e9e378 100644
              ) : (
                "Switches this app and every connected machine whose database the target release supports."
              )
-@@ -333,6 +335,7 @@ function AboutVersionSection() {
+@@ -355,6 +357,7 @@ function AboutVersionSection() {
            control={
              <Select
                value={selectedUpdateChannel}
@@ -49,7 +49,7 @@ index dca3eabc86..fe17e9e378 100644
                onValueChange={(value) => {
                  if (value !== selectedUpdateChannel) {
                    setSwitchChannel(value as DesktopUpdateChannel);
-@@ -343,7 +346,7 @@ function AboutVersionSection() {
+@@ -365,7 +368,7 @@ function AboutVersionSection() {
                  size="sm"
                  className="w-full sm:w-40"
                  aria-label="Update track"

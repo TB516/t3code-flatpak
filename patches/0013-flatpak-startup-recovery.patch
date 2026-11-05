@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/app/DesktopStartupRecovery.ts b/apps/desktop/src/app/DesktopStartupRecovery.ts
-index 4d2dbcfb14..3723bedeaf 100644
+index c8228183aa..ab23819f60 100644
 --- a/apps/desktop/src/app/DesktopStartupRecovery.ts
 +++ b/apps/desktop/src/app/DesktopStartupRecovery.ts
 @@ -17,6 +17,7 @@ import type { BackendStartupFailure } from "../backend/DesktopBackendManager.ts"
@@ -10,7 +10,7 @@ index 4d2dbcfb14..3723bedeaf 100644
  
  const RELEASES_URL = "https://github.com/pingdotgg/t3code/releases";
  const LAST_STARTED_VERSION_FILE = "desktop-last-started-version";
-@@ -74,7 +75,25 @@ const escapeHtml = (value: string) =>
+@@ -78,7 +79,25 @@ const escapeHtml = (value: string) =>
  const actionLink = (action: StartupRecoveryAction, label: string, primary = false) =>
    `<a class="button${primary ? " primary" : ""}" href="${ACTION_ORIGIN}/${action}">${escapeHtml(label)}</a>`;
  
@@ -37,7 +37,7 @@ index 4d2dbcfb14..3723bedeaf 100644
    switch (offer._tag) {
      case "Checking":
        return { text: "Checking for a newer version…", action: "" };
-@@ -106,8 +125,9 @@ function buildStartupRecoveryHtml(input: {
+@@ -115,8 +134,9 @@ function buildStartupRecoveryHtml(input: {
    readonly failure: BackendStartupFailure;
    readonly offer: StartupRecoveryOffer;
    readonly logDir: string;
@@ -48,7 +48,7 @@ index 4d2dbcfb14..3723bedeaf 100644
    const output = input.failure.output.trim();
    return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>T3 Code could not start</title><style>
  :root{color-scheme:light dark;--bg:#fff;--fg:#111;--muted:#666;--line:#ddd;--code:#f4f4f4}
-@@ -119,10 +139,12 @@ h1{font-size:18px;margin:0}p{margin:0}.muted{color:var(--muted)}
+@@ -128,10 +148,12 @@ h1{font-size:18px;margin:0}p{margin:0}.muted{color:var(--muted)}
  .button{color:var(--fg);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:6px 12px}
  .button.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
  pre{flex:1;min-height:60px;margin:0;overflow:auto;background:var(--code);border:1px solid var(--line);border-radius:6px;padding:10px;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
@@ -61,7 +61,7 @@ index 4d2dbcfb14..3723bedeaf 100644
  <div class="actions">${offer.action}${actionLink("copy", "Copy details")}${actionLink("quit", "Quit")}</div>
  <pre>${escapeHtml(output.length > 0 ? output : "The server wrote no output.")}</pre>
  <p class="muted">Version ${escapeHtml(input.appVersion)}. T3 Code tries again in the background. Logs: ${escapeHtml(input.logDir)}</p>
-@@ -151,6 +173,7 @@ export const listen: Effect.Effect<
+@@ -160,6 +182,7 @@ export const listen: Effect.Effect<
    const electronTheme = yield* ElectronTheme.ElectronTheme;
    const electronWindow = yield* ElectronWindow.ElectronWindow;
    const fileSystem = yield* FileSystem.FileSystem;
@@ -69,7 +69,7 @@ index 4d2dbcfb14..3723bedeaf 100644
    const runFork = Effect.runForkWith(yield* Effect.context<never>());
  
    const lastStartedVersionPath = environment.path.join(
-@@ -183,6 +206,7 @@ export const listen: Effect.Effect<
+@@ -199,6 +222,7 @@ export const listen: Effect.Effect<
        failure: failure.value,
        offer: yield* offer,
        logDir: environment.logDir,

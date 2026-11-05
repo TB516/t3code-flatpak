@@ -1,0 +1,13 @@
+diff --git a/packages/shared/src/managedPolicyFile.ts b/packages/shared/src/managedPolicyFile.ts
+index e6faf3b711..3d431f0da4 100644
+--- a/packages/shared/src/managedPolicyFile.ts
++++ b/packages/shared/src/managedPolicyFile.ts
+@@ -42,6 +42,8 @@ export function managedPolicyPath(platform: NodeJS.Platform): string {
+       // %ProgramFiles%, which a user can point somewhere they write.
+       return "C:\\Program Files\\T3Code\\policy.json";
+     default:
++      // Flatpak shows the sandbox the runtime's /etc and mounts the host's at /run/host/etc.
++      if (process.env.FLATPAK_ID) return "/run/host/etc/t3code/policy.json";
+       return "/etc/t3code/policy.json";
+   }
+ }

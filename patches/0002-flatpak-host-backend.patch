@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
-index 4929031395..69c2ad3ded 100644
+index 69a70b68a4..bcf48615be 100644
 --- a/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 +++ b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 @@ -1,5 +1,8 @@
@@ -20,7 +20,7 @@ index 4929031395..69c2ad3ded 100644
        executablePath: process.execPath,
        // Packaged builds have a separate cache; --require prevents cache settings leaking to provider subprocesses.
        args: [
-@@ -541,6 +544,15 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
+@@ -542,6 +545,15 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
        captureOutput: true,
        preflightFailure: Option.none(),
      } satisfies DesktopBackendManager.DesktopBackendStartConfig;

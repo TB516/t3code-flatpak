@@ -28,6 +28,8 @@ finish-args:
   - --filesystem=xdg-download
   # The host server hands the sandboxed browser a /tmp path for preview downloads.
   - --filesystem=/tmp
+  # The desktop reads the host's managed policy at /run/host/etc/t3code/policy.json.
+  - --filesystem=host-etc:ro
   - --filesystem=~/.ssh/config:ro
   - --filesystem=~/.ssh/config.d:ro
   - --filesystem=~/.ssh/known_hosts:ro
