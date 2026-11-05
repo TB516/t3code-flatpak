@@ -38,7 +38,8 @@ outside the sandbox.
 
 Preview tab downloads save to your Downloads folder. On KDE, T3 Code can store
 its secrets in KWallet. With Network access on, Settings shows the host's
-Tailscale HTTPS address.
+Tailscale HTTPS address. A managed policy at `/etc/t3code/policy.json` applies
+to both the app and its host server.
 
 For local builds, see [Building](docs/building.md). Maintainers can find update
 and release instructions in [Publishing](docs/publishing.md).

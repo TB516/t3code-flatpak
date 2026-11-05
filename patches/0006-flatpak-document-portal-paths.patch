@@ -183,7 +183,7 @@ index 4f9ab12edd..30db8e3217 100644
    pickFiles: Effect.fn("desktop.electron.dialog.pickFiles")(function* (input) {
      const ownerWindowId = Option.match(input.owner, {
 diff --git a/apps/desktop/src/ipc/DesktopIpc.ts b/apps/desktop/src/ipc/DesktopIpc.ts
-index 354acc5a81..64f54412fa 100644
+index 354acc5a81..e8e89d9502 100644
 --- a/apps/desktop/src/ipc/DesktopIpc.ts
 +++ b/apps/desktop/src/ipc/DesktopIpc.ts
 @@ -17,7 +17,7 @@ export type DesktopIpcHandleListener = (
@@ -191,7 +191,7 @@ index 354acc5a81..64f54412fa 100644
  ) => unknown | Promise<unknown>;
  
 -export type DesktopIpcSyncListener = (event: DesktopIpcSyncEvent) => void;
-+export type DesktopIpcSyncListener = (event: DesktopIpcSyncEvent, payload: unknown) => void;
++export type DesktopIpcSyncListener = (event: DesktopIpcSyncEvent, payload?: unknown) => void;
  
  export interface DesktopIpcMain {
    removeHandler(channel: string): void;
@@ -219,10 +219,10 @@ index 354acc5a81..64f54412fa 100644
                    Effect.annotateLogs({ channel }),
                    Effect.withSpan("desktop.ipc.invokeSync"),
 diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-index 35333ac3d3..98001d96f3 100644
+index a46dbafab0..8be9e500a7 100644
 --- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
 +++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-@@ -47,6 +47,7 @@ import {
+@@ -48,6 +48,7 @@ import {
    revealWindow,
    pickFolder,
    pickProjectFavicon,
@@ -230,16 +230,16 @@ index 35333ac3d3..98001d96f3 100644
    pickThemeFiles,
    setTheme,
    showContextMenu,
-@@ -93,6 +94,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+@@ -94,6 +95,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
    yield* ipc.handleSync(getAppBranding);
-   yield* ipc.handleSync(getRelayTelemetryEnabled);
+   yield* installRelayTelemetryEnabled();
    yield* ipc.handleSync(getSystemLocale);
 +  yield* ipc.handleSync(resolveHostPath);
    yield* ipc.handleSync(getWindowFullscreenState);
    yield* ipc.handleSync(getLocalEnvironmentBootstraps);
    yield* ipc.handleSync(getLocalEnvironmentEnabled);
 diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
-index 538dd06b0b..c2bb874846 100644
+index 0f125c05de..9ca25157de 100644
 --- a/apps/desktop/src/ipc/channels.ts
 +++ b/apps/desktop/src/ipc/channels.ts
 @@ -1,6 +1,7 @@
@@ -251,10 +251,10 @@ index 538dd06b0b..c2bb874846 100644
  export const SET_THEME_CHANNEL = "desktop:set-theme";
  export const CONTEXT_MENU_CHANNEL = "desktop:context-menu";
 diff --git a/apps/desktop/src/ipc/methods/window.ts b/apps/desktop/src/ipc/methods/window.ts
-index f0d661b58b..95a4cc779a 100644
+index 63b8db03da..063a1a54a4 100644
 --- a/apps/desktop/src/ipc/methods/window.ts
 +++ b/apps/desktop/src/ipc/methods/window.ts
-@@ -250,10 +250,24 @@ export const pickProjectFavicon = DesktopIpc.makeIpcMethod({
+@@ -267,10 +267,24 @@ export const pickProjectFavicon = DesktopIpc.makeIpcMethod({
          },
        ],
      });
@@ -281,7 +281,7 @@ index f0d661b58b..95a4cc779a 100644
    channel: IpcChannels.SET_THEME_CHANNEL,
    payload: DesktopThemeSchema,
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index 950ed972c6..4d9e156341 100644
+index da56807186..907b74c481 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
 @@ -82,7 +82,13 @@ contextBridge.exposeInMainWorld("desktopBridge", {

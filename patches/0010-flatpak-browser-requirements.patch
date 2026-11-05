@@ -76,10 +76,10 @@ index 1847e5f232..eea911ee35 100644
        // Playwright reports Chrome's refusal to sandbox as root as a sandbox failure too.
        return (yield* HostProcess.UserId) === 0
 diff --git a/apps/server/src/preview/ServerBrowser.ts b/apps/server/src/preview/ServerBrowser.ts
-index 84299d3e92..3f27e72264 100644
+index e03d7e3b35..a70ff7d236 100644
 --- a/apps/server/src/preview/ServerBrowser.ts
 +++ b/apps/server/src/preview/ServerBrowser.ts
-@@ -2653,7 +2653,9 @@ const make = Effect.gen(function* () {
+@@ -2710,7 +2710,9 @@ const make = Effect.gen(function* () {
      (yield* PreviewBrowserHost.sandboxBlocked)
    ) {
      yield* Effect.logWarning(
@@ -91,7 +91,7 @@ index 84299d3e92..3f27e72264 100644
    }
  
 diff --git a/apps/server/src/preview/ServerBrowserStream.test.ts b/apps/server/src/preview/ServerBrowserStream.test.ts
-index 5f2c685fa6..da8c227a38 100644
+index c4a709ed8a..f4ba04e2e5 100644
 --- a/apps/server/src/preview/ServerBrowserStream.test.ts
 +++ b/apps/server/src/preview/ServerBrowserStream.test.ts
 @@ -375,6 +375,17 @@ it.effect("passes uploaded files to the page's open picker and needs operate sco
@@ -131,10 +131,10 @@ index 5f2c685fa6..da8c227a38 100644
    }).pipe(Effect.scoped),
  );
 diff --git a/apps/server/src/preview/ServerBrowserStream.ts b/apps/server/src/preview/ServerBrowserStream.ts
-index 8d8164cd91..8c398f83be 100644
+index e46a0c76ad..643870286c 100644
 --- a/apps/server/src/preview/ServerBrowserStream.ts
 +++ b/apps/server/src/preview/ServerBrowserStream.ts
-@@ -212,9 +212,9 @@ const makeHandler = Effect.fnUntraced(function* (browser: ServerBrowser.ServerBr
+@@ -213,9 +213,9 @@ const makeHandler = Effect.fnUntraced(function* (browser: ServerBrowser.ServerBr
  
  const hostSetup = (cause: unknown): PreviewStreamHostSetup | undefined =>
    isSandboxError(cause)
@@ -162,10 +162,10 @@ index e32e8f76f1..28578f27cd 100644
              Try again
            </Button>
 diff --git a/packages/client-runtime/src/preview/serverBrowserStream.ts b/packages/client-runtime/src/preview/serverBrowserStream.ts
-index b71fff335f..9d5ab790a2 100644
+index 617c1d1842..48cde9433b 100644
 --- a/packages/client-runtime/src/preview/serverBrowserStream.ts
 +++ b/packages/client-runtime/src/preview/serverBrowserStream.ts
-@@ -454,7 +454,13 @@ const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
+@@ -463,7 +463,13 @@ const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
    return { need: "sandbox", command: "sudo npx t3 browser setup" };
  };
  
@@ -182,7 +182,7 @@ index b71fff335f..9d5ab790a2 100644
      : "This server's host is missing libraries its browser needs. Run this once on the host, then try again:";
 +};
 diff --git a/packages/contracts/src/preview.ts b/packages/contracts/src/preview.ts
-index cbf8ac60b2..b329300905 100644
+index 1790a4797d..5c80cad2be 100644
 --- a/packages/contracts/src/preview.ts
 +++ b/packages/contracts/src/preview.ts
 @@ -143,6 +143,7 @@ export type PreviewRuntime = typeof PreviewRuntime.Type;
