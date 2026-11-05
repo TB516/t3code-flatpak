@@ -22,7 +22,8 @@
     <release version="0.1.7-1" date="2026-11-04">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.7</url>
       <description>
-        <p>Agents like Claude Code and Codex are found on your system again.</p>
+        <p>Fix the Flatpak sandbox PATH overwriting the host server's PATH, which
+        stopped agents like Claude Code and Codex from being detected.</p>
       </description>
     </release>
     <release version="0.1.7" date="2026-11-04">
