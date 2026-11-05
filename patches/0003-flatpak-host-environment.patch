@@ -1,12 +1,12 @@
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-index 124dbbeae8..3ad3a5dd3b 100644
+index 124dbbeae8..e85dfc7552 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-@@ -163,6 +163,21 @@ function runShellEnvironment(input: {
+@@ -163,6 +163,34 @@ function runShellEnvironment(input: {
  }
  
  describe("DesktopShellEnvironment", () => {
-+  it.effect("leaves the Flatpak environment intact without starting a login shell", () => {
++  it.effect("leaves the Flatpak environment intact and publishes nothing to the host server", () => {
 +    const env = {
 +      FLATPAK_ID: "com.t3tools.t3code",
 +      PATH: "/app/bin:/usr/bin",
@@ -18,14 +18,27 @@ index 124dbbeae8..3ad3a5dd3b 100644
 +      handler: () => {
 +        throw new Error("Flatpak desktop must not probe a host shell");
 +      },
-+    }).pipe(Effect.tap(() => Effect.sync(() => assert.equal(env.PATH, "/app/bin:/usr/bin"))));
++      use: (service) =>
++        Effect.gen(function* () {
++          const prepared = yield* service.awaitDiscovery;
++          assert.isTrue(Option.isNone(yield* Stream.runHead(service.updates)));
++          return prepared;
++        }),
++    }).pipe(
++      Effect.tap((prepared) =>
++        Effect.sync(() => {
++          assert.isFalse(prepared);
++          assert.equal(env.PATH, "/app/bin:/usr/bin");
++        }),
++      ),
++    );
 +  });
 +
    it.effect("does not wait for discovery when the cache is missing", () =>
      Effect.gen(function* () {
        const started = yield* Deferred.make<void>();
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.ts b/apps/desktop/src/shell/DesktopShellEnvironment.ts
-index 37826f8ee5..4843080432 100644
+index 37826f8ee5..212ce6d148 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.ts
 @@ -22,6 +22,7 @@ import * as Stream from "effect/Stream";
@@ -36,14 +49,21 @@ index 37826f8ee5..4843080432 100644
  import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
  
  type EnvironmentPatch = Record<string, string>;
-@@ -529,6 +530,7 @@ const installShellEnvironment = (
-   never,
-   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
- > => {
-+  if (flatpakAppId(config.env, config.platform) !== null) return Effect.succeed(false);
-   if (config.platform === "win32") {
-     return installWindowsEnvironment(config);
-   }
+@@ -563,6 +564,14 @@ const CACHED_ENV_NAMES = [
+ /** @public */
+ export const make = Effect.gen(function* () {
+   const environment = yield* DesktopEnvironment.DesktopEnvironment;
++  // The host server discovers its own environment; publishing the sandbox's would replace it.
++  if (flatpakAppId(process.env, environment.platform) !== null) {
++    return DesktopShellEnvironment.of({
++      installIntoProcess: Effect.succeed(false),
++      awaitDiscovery: Effect.succeed(false),
++      updates: Stream.empty,
++    });
++  }
+   const fileSystem = yield* FileSystem.FileSystem;
+   const path = yield* Path.Path;
+   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
 index 3b45d80bbc..cc2cc4c537 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
