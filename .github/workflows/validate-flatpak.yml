@@ -8,6 +8,7 @@ on:
       - flatpak/**
       - '!flatpak/pages/**'
       - patches/**
+      - tests/packaged/**
   workflow_dispatch:
 
 permissions:
@@ -40,3 +41,15 @@ jobs:
           repo-dir: build-flatpak/validation-repo
           state-dir: build-flatpak/builder-state
           cache-key: flatpak-builder-x86_64-${{ hashFiles('flatpak/**', '!flatpak/pages/**', 'patches/**') }}
+
+      # Launches the built package and checks the sandbox and host still work together.
+      - name: Test the packaged app
+        run: tests/packaged/run.sh --repo build-flatpak/validation-repo
+
+      - name: Upload packaged app test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaged-app-test-results
+          path: build-flatpak/packaged-test-artifacts
+          if-no-files-found: ignore

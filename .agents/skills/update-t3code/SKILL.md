@@ -96,10 +96,11 @@ and anything worth testing on the currently installed version.
   tests, the server tests listed in `flatpak/modules/t3code.yml` and both
   typechecks, but no web tests. Check web changes directly. Make sure the test
   files the manifest lists still exist.
-- Check that the packaged app still works where the release touched it:
-  startup, the host server starting and stopping, and the user flows that
-  changed. Use isolated data where practical. Say what you tested, what you
-  only checked by reading code, and what's unverified.
+- Run `./scripts/test-packaged` to check the built package where the sandbox
+  and host meet. When the release changes a flow these checks don't cover,
+  add a check to `tests/packaged/` or test it by hand with isolated data. Say
+  what you tested, what you only checked by reading code, and what's
+  unverified.
 - Update the user documentation when host requirements, setup or supported
   behavior change.
 - Before handing off, do a final review pass over the whole change set for
