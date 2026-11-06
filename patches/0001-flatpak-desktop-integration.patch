@@ -33,21 +33,20 @@ index 3c571bcf02..4f1cf91396 100644
        preference,
        env: input.env,
 diff --git a/apps/desktop/src/app/DesktopEnvironment.test.ts b/apps/desktop/src/app/DesktopEnvironment.test.ts
-index 200745f111..2b9aa94ef0 100644
+index 200745f111..b0f21ccc7d 100644
 --- a/apps/desktop/src/app/DesktopEnvironment.test.ts
 +++ b/apps/desktop/src/app/DesktopEnvironment.test.ts
-@@ -38,6 +38,18 @@ const makeEnvironment = (
+@@ -38,6 +38,17 @@ const makeEnvironment = (
  ) => DesktopEnvironment.DesktopEnvironment.pipe(Effect.provide(layerEnvironment(overrides, env)));
  
  describe("DesktopEnvironment", () => {
-+  it.effect("uses a distinct Flatpak display name", () =>
++  it.effect("names the Flatpak desktop entry after the app ID", () =>
 +    Effect.gen(function* () {
 +      const environment = yield* makeEnvironment(
 +        { platform: "linux" },
 +        { FLATPAK_ID: "com.t3tools.t3code" },
 +      );
 +
-+      assert.equal(environment.displayName, "T3 Code (Flatpak)");
 +      assert.equal(environment.linuxDesktopEntryName, "com.t3tools.t3code.desktop");
 +    }),
 +  );
