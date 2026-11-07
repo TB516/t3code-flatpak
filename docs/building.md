@@ -24,3 +24,24 @@ To build and install the package for your user, then launch it:
 ```
 
 Build state and output stay in `build-flatpak/`.
+
+## Testing the packaged app
+
+The packaged app checks install a build in a throwaway container, launch it
+headless, and check the places where the sandbox and host meet: the host
+server, agent CLIs found through the login shell, downloads, terminals,
+editors, SSH, Tailscale, managed policy, database maintenance, and the recovery
+screen when the host is out of reach. Docker runs them by default; set
+`CONTAINER_ENGINE=podman` to use Podman.
+
+```sh
+./scripts/test-packaged                     # the build from ./scripts/build-flatpak build
+./scripts/test-packaged published <commit>  # a build from the published repository
+```
+
+The container stands in for a user's machine, so nothing is installed on yours.
+A run needs network access to fetch runtimes and upstream test fixtures. The
+fixtures come from the upstream release in the manifest, so an older published
+commit is checked against the current fixtures. The app logs, plus screenshots
+from failed checks, are written to `build-flatpak/packaged-test-artifacts/`. The
+checks live in `tests/packaged/` and are typechecked before each run.

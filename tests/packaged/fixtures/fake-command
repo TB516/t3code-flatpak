@@ -1,0 +1,23 @@
+#!/bin/sh
+# Stands in for host tools the app should reach outside the sandbox. host.ts
+# installs it as claude, codex, tailscale, code and ssh, and as zed in a stand-in
+# Flatpak. The tests read its log (CALL_LOG in app.ts) to see which calls made it
+# to the host.
+name=$(basename "$0")
+echo "$name $*" >> /tmp/t3-test-calls.log
+
+case "$name $*" in
+    "tailscale status --json"*)
+        echo '{"Self":{"DNSName":"ci-box.tail1234.ts.net.","TailscaleIPs":["100.101.102.103"],"CapMap":{"https":null}}}'
+        ;;
+    "tailscale serve status --json"*)
+        echo '{}'
+        ;;
+    ssh*)
+        echo "ssh: connect to host ci-box port 22: Connection refused" >&2
+        exit 255
+        ;;
+    *--version*)
+        echo "9.9.9 ($name test double)"
+        ;;
+esac

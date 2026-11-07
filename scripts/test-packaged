@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly PROJECT_ROOT
+readonly IMAGE="ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08"
+readonly ENGINE="${CONTAINER_ENGINE:-docker}"
+readonly ARTIFACTS="$PROJECT_ROOT/build-flatpak/packaged-test-artifacts"
+
+# The container gets a read-only checkout; only test artifacts come back out.
+run() {
+    local owner=()
+    # Root in a rootless Podman container is already you; Docker needs the files handed back.
+    if [ "$ENGINE" = docker ]; then
+        owner=(-e "HOST_UID=$(id -u)")
+    fi
+    rm -rf "$ARTIFACTS"
+    mkdir -p "$ARTIFACTS"
+    "$ENGINE" run --rm --privileged \
+        -v "$PROJECT_ROOT:/src:ro" \
+        -v "$ARTIFACTS:/artifacts:Z" \
+        -e T3_TEST_ARTIFACTS=/artifacts \
+        "${owner[@]}" \
+        "$IMAGE" /src/tests/packaged/run.sh "$@"
+}
+
+case "${1:-local}" in
+    local)
+        run --repo /src/build-flatpak/repo
+        ;;
+    published)
+        run --commit "${2:?Usage: $0 published <commit>}"
+        ;;
+    *)
+        echo "Usage: $0 [local | published <commit>]" >&2
+        exit 2
+        ;;
+esac

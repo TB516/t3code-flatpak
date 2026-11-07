@@ -1,0 +1,13 @@
+{
+  "name": "t3code-flatpak-packaged-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "playwright-core": "1.60.0",
+    "typescript": "7.0.2"
+  }
+}
