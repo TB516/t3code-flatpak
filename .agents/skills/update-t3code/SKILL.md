@@ -115,7 +115,9 @@ asked to.
 
 - **PR:** push to the PR branch, rewrite the description to cover the update and
   any packaging changes, mark it ready, and wait for **Validate Flatpak
-  update**. Bot-created runs need approval in the PR.
+  update**. Bot-created runs need approval in the PR. Keep the title in the
+  `type(scope): description` format, such as `fix(flatpak): ...` when packaging
+  fixes are the main change.
 - **Metainfo:** keep the release checker's formatting. Leave the release
   description empty for a plain upstream update. Write a short, specific note
   when the package itself changes. Packaging-only releases append a revision,

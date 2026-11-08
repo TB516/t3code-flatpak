@@ -55,7 +55,7 @@ jobs:
           # Bot-created PRs don't notify anyone unless a person is requested.
           reviewers: TB516
           commit-message: "chore(flatpak): update T3 Code to ${{ steps.release.outputs.result }}"
-          title: Update T3 Code to ${{ steps.release.outputs.result }}
+          title: "chore(flatpak): update T3 Code to ${{ steps.release.outputs.result }}"
           body: |
             Update the pinned T3 Code release to [${{ steps.release.outputs.result }}](https://github.com/pingdotgg/t3code/releases/tag/${{ steps.release.outputs.result }}).
 
