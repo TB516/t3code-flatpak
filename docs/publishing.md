@@ -18,6 +18,10 @@ Each release gets its own branch, such as `automation/update-t3code-v0.0.43`.
 The updater leaves an existing PR for that version alone, so newer releases
 can open separate PRs without overwriting patch fixes under review.
 
+Squash-merging a PR with several commits uses its title as the commit
+message, so PR titles use the `type(scope): description` format, such as
+`chore(flatpak): update T3 Code to v0.1.7`.
+
 **Validate Flatpak update** runs when packaging PRs are opened, updated, or
 reopened. It can also be started from the Actions tab. GitHub requires approval
 for runs triggered by the updater's `GITHUB_TOKEN`; approve them in the PR.
