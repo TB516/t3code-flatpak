@@ -8,9 +8,11 @@ the release tag and matching commit in `flatpak/modules/t3code.yml` and adds the
 release to `flatpak/com.t3tools.t3code.metainfo.xml`. Refresh the numbered
 patches in `patches/` before merging.
 
-For packaging updates without a new upstream release, append a hyphen and
-package revision to the upstream version in AppStream, such as `0.0.42-2`.
-Increment that revision for each packaging release.
+For packaging fixes users will notice without a new upstream release, add an
+AppStream release that appends a hyphen and package revision to the upstream
+version, such as `0.0.42-2`, with a note describing the fix. Increment that
+revision for each such release. Changes users won't notice, such as CI or build
+tweaks, don't need a release entry.
 
 Each release gets its own branch, such as `automation/update-t3code-v0.0.43`.
 The updater leaves an existing PR for that version alone, so newer releases
