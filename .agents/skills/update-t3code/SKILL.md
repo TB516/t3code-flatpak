@@ -48,8 +48,42 @@ on the PR branch.
 
 Rebase the patch series in `patches/` onto the new upstream tag, using an
 upstream checkout in the gitignored `build-flatpak/` directory. Keep one commit
-per patch so the files can be regenerated from them. Follow each conflicting
-upstream change's intent:
+per patch so the files can be regenerated from them.
+
+The old tag is the `tag:` currently on `main` in `flatpak/modules/t3code.yml`.
+The new tag is the one the update PR pins there. The patch files are plain
+`git diff` output, not mail-format patches, so apply them with `git apply`
+and name each commit after its file. That keeps each patch's number through
+the rebase. Run from the repo root:
+
+```bash
+old=v0.1.7 new=v0.1.8   # replace with the real tags
+up=build-flatpak/upstream
+[ -d $up ] || git clone https://github.com/pingdotgg/t3code.git $up
+git -C $up fetch --tags origin
+git -C $up switch -C patches $old
+for p in patches/*.patch; do
+  git -C $up apply --index "$PWD/$p" && git -C $up commit -q -m "$(basename $p .patch)" || break
+done
+git -C $up rebase --onto $new $old patches
+```
+
+Resolve conflicts commit by commit, then regenerate the files:
+
+```bash
+rm patches/*.patch
+for c in $(git -C $up rev-list --reverse $new..patches); do
+  git -C $up diff --abbrev=10 $c^ $c > "patches/$(git -C $up log -1 --format=%s $c).patch"
+done
+```
+
+Patches upstream made redundant show up as deleted files. Surviving patches
+keep their numbers, gaps included. For a new patch, commit it on `patches`
+with its file name as the message, such as `0015-flatpak-<name>`, numbered
+after the highest file in `patches/`.
+Make sure the manifest's `type: patch` list matches the files in `patches/`.
+Running this with `new` set to the same tag as `old` must leave `patches/`
+unchanged. Follow each conflicting upstream change's intent:
 
 - Drop what upstream now does itself or no longer needs, including whole
   patches. Remove a retired patch's file and its manifest entry.
