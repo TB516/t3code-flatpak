@@ -23,8 +23,10 @@ message, so PR titles use the `type(scope): description` format, such as
 `chore(flatpak): update T3 Code to v0.1.7`.
 
 **Validate Flatpak update** runs when packaging PRs are opened, updated, or
-reopened. It can also be started from the Actions tab. GitHub requires approval
-for runs triggered by the updater's `GITHUB_TOKEN`; approve them in the PR.
+reopened. It can also be started from the Actions tab. The updater opens PRs
+as the `tbot516` GitHub App, so validation starts on its own. Install the app
+on this repository and store its client ID as the Actions variable
+`BOT_CLIENT_ID` and its private key as the Actions secret `BOT_PRIVATE_KEY`.
 New commits cancel older validation runs for the same PR. Website-only changes
 skip package validation and do not change the build cache key.
 The workflow applies the patches, builds the Flatpak, runs desktop tests and
