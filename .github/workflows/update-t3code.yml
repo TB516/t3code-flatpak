@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: update-t3code
@@ -42,17 +42,27 @@ jobs:
             echo "open=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Create bot token
+        if: steps.existing.outputs.open != 'true'
+        id: bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.BOT_CLIENT_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+
+      # The bot opens the PR so validation starts on its own.
       - name: Open update pull request
         if: steps.existing.outputs.open != 'true'
         uses: peter-evans/create-pull-request@v8
         with:
+          token: ${{ steps.bot.outputs.token }}
           add-paths: |
             flatpak/modules/t3code.yml
             flatpak/com.t3tools.t3code.metainfo.xml
           branch: automation/update-t3code-${{ steps.release.outputs.result }}
           delete-branch: true
           draft: true
-          # Bot-created PRs don't notify anyone unless a person is requested.
+          # Notifies me of each update, since the PR needs its patches refreshed by hand.
           reviewers: TB516
           commit-message: "chore(flatpak): update T3 Code to ${{ steps.release.outputs.result }}"
           title: "chore(flatpak): update T3 Code to ${{ steps.release.outputs.result }}"
