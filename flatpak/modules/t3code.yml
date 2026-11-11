@@ -56,6 +56,13 @@ test-commands:
     src/cli/doctor.test.ts
     src/persistence/DatabaseMaintenance.test.ts
   - pnpm --filter t3 typecheck
+  # Upstream's lint and format rules, on the files the patches change or add.
+  - >-
+    git ls-files --modified --others --exclude-standard
+    -- '*.ts' '*.tsx' ':!flatpak-output' ':!flatpak-package'
+    > patched-files
+  - xargs -r -a patched-files pnpm exec vp lint --report-unused-disable-directives
+  - xargs -r -a patched-files pnpm exec vp fmt --check
 sources:
   - type: git
     url: https://github.com/pingdotgg/t3code.git

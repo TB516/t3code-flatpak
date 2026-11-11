@@ -1,9 +1,9 @@
 diff --git a/apps/desktop/src/electron/ElectronDialog.test.ts b/apps/desktop/src/electron/ElectronDialog.test.ts
 new file mode 100644
-index 0000000000..8ae86ba2fa
+index 0000000000..31abfc1091
 --- /dev/null
 +++ b/apps/desktop/src/electron/ElectronDialog.test.ts
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,96 @@
 +import { assert, describe, it } from "@effect/vitest";
 +import * as Effect from "effect/Effect";
 +import * as Option from "effect/Option";
@@ -70,10 +70,12 @@ index 0000000000..8ae86ba2fa
 +  );
 +
 +  it("leaves ordinary paths alone without asking the host", () => {
-+    vi.stubEnv("FLATPAK_ID", "com.t3tools.t3code");
-+    vi.stubEnv("XDG_RUNTIME_DIR", "/run/user/1000");
++    const env = { FLATPAK_ID: "com.t3tools.t3code", XDG_RUNTIME_DIR: "/run/user/1000" };
 +
-+    assert.equal(ElectronDialog.resolveHostPath("/home/alice/project"), "/home/alice/project");
++    assert.equal(
++      ElectronDialog.resolveHostPath("/home/alice/project", env, "linux"),
++      "/home/alice/project",
++    );
 +    assert.equal(execFileMock.mock.calls.length, 0);
 +  });
 +
@@ -99,19 +101,21 @@ index 0000000000..8ae86ba2fa
 +  );
 +});
 diff --git a/apps/desktop/src/electron/ElectronDialog.ts b/apps/desktop/src/electron/ElectronDialog.ts
-index 4f9ab12edd..058975103d 100644
+index 4f9ab12edd..8390ff5c88 100644
 --- a/apps/desktop/src/electron/ElectronDialog.ts
 +++ b/apps/desktop/src/electron/ElectronDialog.ts
-@@ -1,3 +1,7 @@
+@@ -1,11 +1,83 @@
 +// @effect-diagnostics nodeBuiltinImport:off -- This native bridge wraps its errors at the public boundary.
-+import { execFileSync } from "node:child_process";
++import * as NodeChildProcess from "node:child_process";
 +import * as NodePath from "node:path";
 +
  import * as Context from "effect/Context";
  import * as Effect from "effect/Effect";
  import * as Layer from "effect/Layer";
-@@ -6,6 +10,64 @@ import * as Schema from "effect/Schema";
+ import * as Option from "effect/Option";
+ import * as Schema from "effect/Schema";
  
++import * as HostProcess from "@t3tools/shared/HostProcess";
  import * as Electron from "electron";
  
 +import { flatpakAppId } from "../app/Flatpak.ts";
@@ -120,18 +124,22 @@ index 4f9ab12edd..058975103d 100644
 + * Pickers and drops can return a document portal path, but the server runs on the host.
 + * The host service's PATH is small, so sh finds `flatpak` with the user's captured PATH.
 + */
-+export function resolveHostPath(path: string): string {
-+  const runtimeDir = process.env.XDG_RUNTIME_DIR;
++export function resolveHostPath(
++  path: string,
++  env: NodeJS.ProcessEnv,
++  platform: NodeJS.Platform,
++): string {
++  const runtimeDir = env.XDG_RUNTIME_DIR;
 +  if (
-+    flatpakAppId(process.env, process.platform) === null ||
++    flatpakAppId(env, platform) === null ||
 +    !runtimeDir ||
 +    !path.startsWith(`${runtimeDir}/doc/`)
 +  ) {
 +    return path;
 +  }
 +
-+  const hostPath = process.env.T3CODE_FLATPAK_HOST_PATH;
-+  const stdout = execFileSync(
++  const hostPath = env.T3CODE_FLATPAK_HOST_PATH;
++  const stdout = NodeChildProcess.execFileSync(
 +    "/usr/bin/flatpak-spawn",
 +    [
 +      "--host",
@@ -166,16 +174,21 @@ index 4f9ab12edd..058975103d 100644
 +  }
 +}
 +
-+export const tryResolveHostPath = (path: string) =>
-+  Effect.try({
-+    try: () => resolveHostPath(path),
++export const tryResolveHostPath = Effect.fn("desktop.electron.dialog.resolveHostPath")(function* (
++  path: string,
++) {
++  const env = yield* HostProcess.Environment;
++  const platform = yield* HostProcess.Platform;
++  return yield* Effect.try({
++    try: () => resolveHostPath(path, env, platform),
 +    catch: (cause) => new ElectronDialogResolveHostPathError({ path, cause }),
 +  });
++});
 +
  export class ElectronDialogPickFolderError extends Schema.TaggedError<ElectronDialogPickFolderError>()(
    "ElectronDialogPickFolderError",
    {
-@@ -138,7 +200,20 @@ export const make = ElectronDialog.of({
+@@ -138,7 +210,22 @@ export const make = ElectronDialog.of({
      if (result.canceled) {
        return Option.none();
      }
@@ -184,8 +197,10 @@ index 4f9ab12edd..058975103d 100644
 +    if (!folderPath) {
 +      return Option.none();
 +    }
++    const env = yield* HostProcess.Environment;
++    const platform = yield* HostProcess.Platform;
 +    const hostPath = yield* Effect.try({
-+      try: () => resolveHostPath(folderPath),
++      try: () => resolveHostPath(folderPath, env, platform),
 +      catch: (cause) =>
 +        new ElectronDialogPickFolderError({
 +          ownerWindowId,
@@ -266,10 +281,10 @@ index aebbc1c24f..dceb96e655 100644
  export const SET_THEME_CHANNEL = "desktop:set-theme";
  export const CONTEXT_MENU_CHANNEL = "desktop:context-menu";
 diff --git a/apps/desktop/src/ipc/methods/window.ts b/apps/desktop/src/ipc/methods/window.ts
-index e0eea5c74c..d1e22371a9 100644
+index e0eea5c74c..2fd7c294de 100644
 --- a/apps/desktop/src/ipc/methods/window.ts
 +++ b/apps/desktop/src/ipc/methods/window.ts
-@@ -276,10 +276,24 @@ export const pickProjectFavicon = DesktopIpc.makeIpcMethod({
+@@ -276,10 +276,26 @@ export const pickProjectFavicon = DesktopIpc.makeIpcMethod({
          },
        ],
      });
@@ -282,11 +297,13 @@ index e0eea5c74c..d1e22371a9 100644
    }),
  });
  
++const decodeDroppedPath = Schema.decodeUnknownEffect(Schema.String);
++
 +/** Drops resolve synchronously so the composer inserts into the thread that received them. */
 +export const resolveHostPath: DesktopIpc.DesktopSyncIpcMethod<never, never> = {
 +  channel: IpcChannels.RESOLVE_HOST_PATH_CHANNEL,
 +  handler: (path) =>
-+    Schema.decodeUnknownEffect(Schema.String)(path).pipe(
++    decodeDroppedPath(path).pipe(
 +      Effect.flatMap(ElectronDialog.tryResolveHostPath),
 +      Effect.orElseSucceed(() => ""),
 +    ),

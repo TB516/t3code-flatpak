@@ -59,7 +59,7 @@ index 9f975ee209..0ae8ece943 100644
    "reveals a WSL file in Windows File Explorer through its UNC path",
    () =>
 diff --git a/apps/server/src/process/externalLauncher.ts b/apps/server/src/process/externalLauncher.ts
-index 7f4417d1fb..310e0efac5 100644
+index 7f4417d1fb..8ec3c6a3e5 100644
 --- a/apps/server/src/process/externalLauncher.ts
 +++ b/apps/server/src/process/externalLauncher.ts
 @@ -122,6 +122,67 @@ const CommandLookupEnvConfig = Config.all({
@@ -147,10 +147,17 @@ index 7f4417d1fb..310e0efac5 100644
        available.push(editor.id);
      }
    }
-@@ -476,8 +538,24 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
+@@ -476,13 +538,26 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
    }
  
    if (editorDef.commands) {
+-    const { command, baseArgs } = Option.getOrElse(
+-      yield* resolveEditorCommand(editorDef, env),
+-      () => ({
+-        command: editorDef.commands[0],
+-        baseArgs: "baseArgs" in editorDef ? editorDef.baseArgs : [],
+-      }),
+-    );
 +    const installedCommand = yield* resolveEditorCommand(editorDef, env);
 +    if (Option.isNone(installedCommand)) {
 +      const appId = installedFlatpakEditorAppId(
@@ -167,9 +174,10 @@ index 7f4417d1fb..310e0efac5 100644
 +        };
 +      }
 +    }
-     const { command, baseArgs } = Option.getOrElse(
--      yield* resolveEditorCommand(editorDef, env),
-+      installedCommand,
-       () => ({
-         command: editorDef.commands[0],
-         baseArgs: "baseArgs" in editorDef ? editorDef.baseArgs : [],
++    const { command, baseArgs } = Option.getOrElse(installedCommand, () => ({
++      command: editorDef.commands[0],
++      baseArgs: "baseArgs" in editorDef ? editorDef.baseArgs : [],
++    }));
+     return {
+       editor: editorDef.id,
+       target: input.cwd,

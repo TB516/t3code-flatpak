@@ -1,38 +1,41 @@
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-index 0c78691943..b68be05c8d 100644
+index 0c78691943..8bf03d24fb 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-@@ -163,6 +163,34 @@ function runShellEnvironment(input: {
+@@ -163,6 +163,37 @@ function runShellEnvironment(input: {
  }
  
  describe("DesktopShellEnvironment", () => {
-+  it.effect("leaves the Flatpak environment intact and publishes nothing to the host server", () => {
-+    const env = {
-+      FLATPAK_ID: "com.t3tools.t3code",
-+      PATH: "/app/bin:/usr/bin",
-+      HOME: "/home/alice",
-+    };
-+    return runShellEnvironment({
-+      env,
-+      platform: "linux",
-+      handler: () => {
-+        throw new Error("Flatpak desktop must not probe a host shell");
-+      },
-+      use: (service) =>
-+        Effect.gen(function* () {
-+          const prepared = yield* service.awaitDiscovery;
-+          assert.isTrue(Option.isNone(yield* Stream.runHead(service.updates)));
-+          return prepared;
-+        }),
-+    }).pipe(
-+      Effect.tap((prepared) =>
-+        Effect.sync(() => {
-+          assert.isFalse(prepared);
-+          assert.equal(env.PATH, "/app/bin:/usr/bin");
-+        }),
-+      ),
-+    );
-+  });
++  it.effect(
++    "leaves the Flatpak environment intact and publishes nothing to the host server",
++    () => {
++      const env = {
++        FLATPAK_ID: "com.t3tools.t3code",
++        PATH: "/app/bin:/usr/bin",
++        HOME: "/home/alice",
++      };
++      return runShellEnvironment({
++        env,
++        platform: "linux",
++        handler: () => {
++          throw new Error("Flatpak desktop must not probe a host shell");
++        },
++        use: (service) =>
++          Effect.gen(function* () {
++            const prepared = yield* service.awaitDiscovery;
++            assert.isTrue(Option.isNone(yield* Stream.runHead(service.updates)));
++            return prepared;
++          }),
++      }).pipe(
++        Effect.tap((prepared) =>
++          Effect.sync(() => {
++            assert.isFalse(prepared);
++            assert.equal(env.PATH, "/app/bin:/usr/bin");
++          }),
++        ),
++      );
++    },
++  );
 +
    it.effect("does not wait for discovery when the cache is missing", () =>
      Effect.gen(function* () {
