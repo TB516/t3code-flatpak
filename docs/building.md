@@ -13,8 +13,8 @@ or update them.
 ```
 
 This builds the package, runs desktop tests and the editor launcher test,
-typechecks the desktop and server, and writes
-`build-flatpak/com.t3tools.t3code.flatpak`.
+typechecks the desktop and server, lints and format-checks the files the
+patches change, and writes `build-flatpak/com.t3tools.t3code.flatpak`.
 
 To build and install the package for your user, then launch it:
 
@@ -30,9 +30,9 @@ Build state and output stay in `build-flatpak/`.
 The packaged app checks install a build in a throwaway container, launch it
 headless, and check the places where the sandbox and host meet: the host
 server, agent CLIs found through the login shell, downloads, terminals,
-editors, SSH, Tailscale, managed policy, database maintenance, and the recovery
-screen when the host is out of reach. Docker runs them by default; set
-`CONTAINER_ENGINE=podman` to use Podman.
+editors, SSH, Tailscale, managed policy, deleting the old database, reclaiming
+database space, and the recovery screen when the host is out of reach. Docker
+runs them by default; set `CONTAINER_ENGINE=podman` to use Podman.
 
 ```sh
 ./scripts/test-packaged                     # the build from ./scripts/build-flatpak build

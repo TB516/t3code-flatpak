@@ -30,10 +30,11 @@ on this repository and store its client ID as the Actions variable
 New commits cancel older validation runs for the same PR. Website-only changes
 skip package validation and do not change the build cache key.
 The workflow applies the patches, builds the Flatpak, runs desktop tests and
-the editor launcher test, and typechecks the desktop and server. The WSL test
-file is excluded because some of its tests inspect host processes that the
-Flatpak build sandbox cannot see. It then installs the build in the CI
-container and runs the packaged app checks described in
+the editor launcher test, typechecks the desktop and server, and lints and
+format-checks the files the patches change. The WSL test file is excluded
+because some of its tests inspect host processes that the Flatpak build sandbox
+cannot see. It then installs the build in the CI container and runs the
+packaged app checks described in
 [Building](building.md#testing-the-packaged-app). Failed checks upload their
 screenshots and logs as a workflow artifact.
 

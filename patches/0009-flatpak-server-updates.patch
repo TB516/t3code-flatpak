@@ -68,7 +68,7 @@ index 58baa160ad..85835f020a 100644
        },
      ),
 diff --git a/apps/server/src/environment/ServerEnvironment.test.ts b/apps/server/src/environment/ServerEnvironment.test.ts
-index 3960b5b8d1..5016da75a2 100644
+index dc719ed93c..9567631217 100644
 --- a/apps/server/src/environment/ServerEnvironment.test.ts
 +++ b/apps/server/src/environment/ServerEnvironment.test.ts
 @@ -91,7 +91,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
@@ -84,7 +84,7 @@ index 3960b5b8d1..5016da75a2 100644
          const descriptor = yield* Effect.gen(function* () {
            const environment = yield* ServerEnvironment.ServerEnvironment;
            return yield* environment.getDescriptor;
-@@ -99,13 +103,15 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
+@@ -99,13 +103,16 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
            Effect.provide(
              ServerEnvironment.layer.pipe(
                Layer.provide(layerEmptySecretStore),
@@ -96,13 +96,14 @@ index 3960b5b8d1..5016da75a2 100644
            Effect.provideService(HostProcess.IsExecutable, false),
            Effect.provideService(HostProcess.Platform, "linux"),
 -          Effect.provideService(HostProcess.Environment, {}),
-+          Effect.provideService(HostProcess.Environment, {
-+            ...(flatpakManaged ? { T3CODE_FLATPAK_SERVER: "/installed/flatpak/t3code" } : {}),
-+          }),
++          Effect.provideService(
++            HostProcess.Environment,
++            flatpakManaged ? { T3CODE_FLATPAK_SERVER: "/installed/flatpak/t3code" } : {},
++          ),
          );
          expect(descriptor.capabilities.serverInstallation).toEqual(
            mode === "web" ? { kind: "npm-global", prefix } : undefined,
-@@ -113,6 +119,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
+@@ -113,6 +120,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
          expect(descriptor.capabilities.serverSelfUpdate).toBe(
            mode === "web" ? undefined : "desktop-managed",
          );
@@ -113,10 +114,10 @@ index 3960b5b8d1..5016da75a2 100644
            settledWorktreeCleanup: true,
            storageCleanupRun: true,
 diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index 0787a3702c..e8edc3cfee 100644
+index 74c6865807..f1df53d13a 100644
 --- a/apps/server/src/environment/ServerEnvironment.ts
 +++ b/apps/server/src/environment/ServerEnvironment.ts
-@@ -201,8 +201,11 @@ export const make = Effect.gen(function* () {
+@@ -203,8 +203,11 @@ export const make = Effect.gen(function* () {
    const serverInstallation = serverSelfUpdate === null ? yield* resolveServerInstallation : null;
    // Desktop and server ship together; a control fd guarantees requestDesktopUpdate support.
  

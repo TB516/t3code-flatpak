@@ -56,11 +56,18 @@ test-commands:
     src/cli/doctor.test.ts
     src/persistence/DatabaseMaintenance.test.ts
   - pnpm --filter t3 typecheck
+  # Upstream's lint and format rules, on the files the patches change or add.
+  - >-
+    git ls-files --modified --others --exclude-standard
+    -- '*.ts' '*.tsx' ':!flatpak-output' ':!flatpak-package'
+    > patched-files
+  - xargs -r -a patched-files pnpm exec vp lint --report-unused-disable-directives
+  - xargs -r -a patched-files pnpm exec vp fmt --check
 sources:
   - type: git
     url: https://github.com/pingdotgg/t3code.git
-    tag: v0.1.7
-    commit: 322f6544dfad0a3c8a0c8cbecf2c7f7874b14268
+    tag: v0.1.8
+    commit: bf469bb19669671d0df2efda74ed73867a7137c0
     x-checker-data:
       type: json
       url: https://api.github.com/repos/pingdotgg/t3code/releases/latest
@@ -79,10 +86,11 @@ sources:
       - ../../patches/0008-flatpak-cli-launcher.patch
       - ../../patches/0009-flatpak-server-updates.patch
       - ../../patches/0010-flatpak-browser-requirements.patch
-      - ../../patches/0011-flatpak-database-maintenance.patch
+      - ../../patches/0011-flatpak-legacy-database.patch
       - ../../patches/0012-flatpak-update-channel.patch
       - ../../patches/0013-flatpak-startup-recovery.patch
       - ../../patches/0014-flatpak-managed-policy.patch
+      - ../../patches/0015-flatpak-browser-import.patch
     use-git: true
   - type: dir
     path: ../package

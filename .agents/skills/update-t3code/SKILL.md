@@ -127,8 +127,9 @@ and anything worth testing on the currently installed version.
 
 - Make the agreed changes in the style of the existing patches.
 - Run `./scripts/build-flatpak build` from the repo root. It runs the desktop
-  tests, the server tests listed in `flatpak/modules/t3code.yml` and both
-  typechecks, but no web tests. Check web changes directly. Make sure the test
+  tests, the server tests listed in `flatpak/modules/t3code.yml`, both
+  typechecks, and upstream's lint and format checks on the patched files, but
+  no web tests or web typecheck. Check web changes directly. Make sure the test
   files the manifest lists still exist.
 - Run `./scripts/test-packaged` to check the built package where the sandbox
   and host meet. When the release changes a flow these checks don't cover,
