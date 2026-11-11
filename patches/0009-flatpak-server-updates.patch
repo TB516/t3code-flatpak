@@ -1,11 +1,11 @@
 diff --git a/apps/server/src/cloud/selfUpdate.test.ts b/apps/server/src/cloud/selfUpdate.test.ts
-index a938d67788..8e3f30eea5 100644
+index 6be4288ce3..e22848f9ae 100644
 --- a/apps/server/src/cloud/selfUpdate.test.ts
 +++ b/apps/server/src/cloud/selfUpdate.test.ts
-@@ -160,6 +160,28 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
- });
+@@ -196,6 +196,28 @@ it.layer(NodeServices.layer)("server self update", (it) => {
+     }),
+   );
  
- it.layer(NodeServices.layer)("server self update", (it) => {
 +  it.effect("rejects Flatpak updates and commits before invoking any updater", () =>
 +    Effect.gen(function* () {
 +      const { selfUpdate, order } = yield* makeHarness({
@@ -32,7 +32,7 @@ index a938d67788..8e3f30eea5 100644
    it.effect("rejects invalid versions and desktop-managed servers before staging", () =>
      Effect.gen(function* () {
 diff --git a/apps/server/src/cloud/selfUpdate.ts b/apps/server/src/cloud/selfUpdate.ts
-index 58baa160ad..85835f020a 100644
+index 5e29996413..505b5e4a11 100644
 --- a/apps/server/src/cloud/selfUpdate.ts
 +++ b/apps/server/src/cloud/selfUpdate.ts
 @@ -138,6 +138,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
@@ -55,7 +55,7 @@ index 58baa160ad..85835f020a 100644
      const policyRefusal = managedUpdateRefusal(
        policy.document,
        capability === "boot-service" ? cliReleaseChannelOf(input.targetVersion.trim()) : undefined,
-@@ -322,6 +328,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+@@ -333,6 +339,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
      update,
      commitDesktopUpdate: Effect.fn("ServerSelfUpdate.commitDesktopUpdate")(
        function (requestId, onHandoffAccepted) {
@@ -114,7 +114,7 @@ index dc719ed93c..9567631217 100644
            settledWorktreeCleanup: true,
            storageCleanupRun: true,
 diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index 74c6865807..f1df53d13a 100644
+index 9e29b0fded..ab77356eae 100644
 --- a/apps/server/src/environment/ServerEnvironment.ts
 +++ b/apps/server/src/environment/ServerEnvironment.ts
 @@ -203,8 +203,11 @@ export const make = Effect.gen(function* () {

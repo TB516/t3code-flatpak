@@ -69,17 +69,19 @@ index 9d9e390c95..0f4e738aba 100644
    const path = yield* Path.Path;
    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index 3b45d80bbc..cc2cc4c537 100644
+index 604fbeda3c..1b14a0497b 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
-@@ -1,4 +1,4 @@
+@@ -1,6 +1,6 @@
+ import * as NodeModule from "node:module";
+ 
 -import { assert, describe, it } from "@effect/vitest";
 +import { assert, describe, it, vi } from "@effect/vitest";
  import { DESKTOP_UPDATE_RESTART_MARKER_FILE } from "@t3tools/contracts";
+ import { computeReleaseNotes } from "electron-updater/out/providers/GitHubProvider.js";
  import * as Cause from "effect/Cause";
- import * as Deferred from "effect/Deferred";
-@@ -23,6 +23,28 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
- import { flushCallbacks, makeHarness } from "./updatesTestHarness.ts";
+@@ -77,6 +77,28 @@ const stableUpdateInfo = (
+ };
  
  describe("DesktopUpdates", () => {
 +  it.effect("leaves updates to Flatpak even when an update feed is configured", () => {
@@ -108,7 +110,7 @@ index 3b45d80bbc..cc2cc4c537 100644
      Effect.gen(function* () {
        const linuxState = (packageType: string | undefined) =>
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index 14688e5258..81ee76338d 100644
+index 36492ca7b9..75ef423a27 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
 @@ -1,3 +1,4 @@
@@ -116,7 +118,7 @@ index 14688e5258..81ee76338d 100644
  import {
    DESKTOP_UPDATE_RESTART_MARKER_FILE,
    DesktopUpdateChannelSchema,
-@@ -339,6 +340,9 @@ function getAutoUpdateDisabledReason(args: {
+@@ -343,6 +344,9 @@ function getAutoUpdateDisabledReason(args: {
    disabledByEnv: boolean;
    hasUpdateFeedConfig: boolean;
  }): string | null {
