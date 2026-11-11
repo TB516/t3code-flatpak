@@ -1,21 +1,14 @@
 diff --git a/apps/desktop/src/app/DesktopCliCommand.test.ts b/apps/desktop/src/app/DesktopCliCommand.test.ts
-index 8566613dd6..5544427bf7 100644
+index 2dc59c5889..0a13af3121 100644
 --- a/apps/desktop/src/app/DesktopCliCommand.test.ts
 +++ b/apps/desktop/src/app/DesktopCliCommand.test.ts
-@@ -1,5 +1,5 @@
- import * as NodeServices from "@effect/platform-node/NodeServices";
--import { afterEach, beforeEach, expect, it } from "@effect/vitest";
-+import { afterEach, beforeEach, expect, it, vi } from "@effect/vitest";
- import * as HostProcess from "@t3tools/shared/HostProcess";
- import * as Effect from "effect/Effect";
- import * as FileSystem from "effect/FileSystem";
-@@ -93,6 +93,37 @@ afterEach(() => {
- });
+@@ -94,6 +94,38 @@ const fakePowerShell = (initial: string, inherited: Record<string, string> = {})
+ };
  
  it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
 +  it.effect("hides Flatpak CLI setup and leaves launchers and host command links untouched", () =>
 +    Effect.gen(function* () {
-+      vi.stubEnv("FLATPAK_ID", "com.t3tools.t3code");
++      const env = { FLATPAK_ID: "com.t3tools.t3code" };
 +      const fs = yield* FileSystem.FileSystem;
 +      const path = yield* Path.Path;
 +      const home = yield* fs.makeTempDirectoryScoped();
@@ -23,7 +16,7 @@ index 8566613dd6..5544427bf7 100644
 +      const link = path.join(home, ".local", "bin", "t3");
 +      yield* fs.makeDirectory(path.dirname(link), { recursive: true });
 +      yield* fs.writeFileString(link, "existing host command");
-+      const command = yield* commandIn({ home, baseDir });
++      const command = yield* commandIn({ home, baseDir, env });
 +      expect(yield* command.state).toEqual({
 +        supported: false,
 +        installedPath: null,
@@ -37,33 +30,34 @@ index 8566613dd6..5544427bf7 100644
 +          DesktopEnvironment.DesktopEnvironment,
 +          environmentFor(path, { home, baseDir }),
 +        ),
++        Effect.provideService(HostProcess.Environment, env),
 +      );
 +      expect(Option.isNone(shim)).toBe(true);
 +      expect(yield* fs.exists(path.join(baseDir, "bin", "t3"))).toBe(false);
 +      expect(yield* fs.readFileString(link)).toBe("existing host command");
-+    }).pipe(Effect.scoped, Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs()))),
++    }).pipe(Effect.scoped),
 +  );
 +
    it.effect("links the launcher onto PATH and removes only that link", () =>
      Effect.gen(function* () {
-       const fs = yield* FileSystem.FileSystem;
+       const env: NodeJS.ProcessEnv = { PATH: "", SHELL: "/bin/zsh" };
 diff --git a/apps/desktop/src/app/DesktopCliCommand.ts b/apps/desktop/src/app/DesktopCliCommand.ts
-index f53895a60a..ca20eb3ecf 100644
+index b5306a6bb5..afb011e165 100644
 --- a/apps/desktop/src/app/DesktopCliCommand.ts
 +++ b/apps/desktop/src/app/DesktopCliCommand.ts
-@@ -12,6 +12,7 @@ import * as Stream from "effect/Stream";
- import * as ChildProcess from "effect/process/ChildProcess";
- import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+@@ -17,6 +17,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+ 
+ import { pathSetup, readUserLoginShell } from "@t3tools/shared/shell";
  
 +import { flatpakAppId } from "./Flatpak.ts";
  import * as DesktopCliShim from "./DesktopCliShim.ts";
  import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+ import { makeComponentLogger } from "./DesktopObservability.ts";
+@@ -79,6 +80,24 @@ export class DesktopCliCommand extends Context.Service<
  
-@@ -64,6 +65,22 @@ export class DesktopCliCommand extends Context.Service<
- /** @public */
  export const make = Effect.gen(function* () {
    const environment = yield* DesktopEnvironment.DesktopEnvironment;
-+  if (flatpakAppId(process.env, environment.platform) !== null) {
++  if (flatpakAppId(yield* HostProcess.Environment, environment.platform) !== null) {
 +    const unsupported = {
 +      supported: false,
 +      installedPath: null,
@@ -77,29 +71,38 @@ index f53895a60a..ca20eb3ecf 100644
 +      state: Effect.succeed(unsupported),
 +      install: unavailable,
 +      uninstall: unavailable,
++      addToPath: unavailable,
++      installOnFirstLaunch: Effect.void,
 +    });
 +  }
    const fs = yield* FileSystem.FileSystem;
    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-   const path = environment.path;
+   // Read the live env: shell discovery patches PATH after startup, and Windows variable
 diff --git a/apps/desktop/src/app/DesktopCliShim.ts b/apps/desktop/src/app/DesktopCliShim.ts
-index 3d4b94abff..f4dc8cb4c0 100644
+index f8bd8b5f91..7ab57eec94 100644
 --- a/apps/desktop/src/app/DesktopCliShim.ts
 +++ b/apps/desktop/src/app/DesktopCliShim.ts
-@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
+@@ -1,9 +1,11 @@
++import * as HostProcess from "@t3tools/shared/HostProcess";
+ import * as Cause from "effect/Cause";
+ import * as Effect from "effect/Effect";
  import * as FileSystem from "effect/FileSystem";
  import * as Option from "effect/Option";
+ import * as Random from "effect/Random";
  
 +import { flatpakAppId } from "./Flatpak.ts";
  import * as DesktopEnvironment from "./DesktopEnvironment.ts";
  import { makeComponentLogger } from "./DesktopObservability.ts";
  
-@@ -121,7 +122,9 @@ export const launcherPath = (environment: DesktopEnvironment.DesktopEnvironment[
+@@ -122,7 +124,12 @@ export const launcherPath = (environment: DesktopEnvironment.DesktopEnvironment[
  
  export const install = Effect.gen(function* () {
    const environment = yield* DesktopEnvironment.DesktopEnvironment;
 -  if (!environment.isPackaged) return Option.none<string>();
-+  if (!environment.isPackaged || flatpakAppId(process.env, environment.platform) !== null) {
++  if (
++    !environment.isPackaged ||
++    flatpakAppId(yield* HostProcess.Environment, environment.platform) !== null
++  ) {
 +    return Option.none<string>();
 +  }
    const fs = yield* FileSystem.FileSystem;

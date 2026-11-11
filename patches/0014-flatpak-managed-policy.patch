@@ -1,5 +1,5 @@
 diff --git a/packages/shared/src/managedPolicyFile.ts b/packages/shared/src/managedPolicyFile.ts
-index e6faf3b711..3d431f0da4 100644
+index 2f775abb8a..c2ee21b660 100644
 --- a/packages/shared/src/managedPolicyFile.ts
 +++ b/packages/shared/src/managedPolicyFile.ts
 @@ -42,6 +42,8 @@ export function managedPolicyPath(platform: NodeJS.Platform): string {

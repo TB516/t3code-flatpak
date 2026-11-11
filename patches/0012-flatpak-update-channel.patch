@@ -15,10 +15,10 @@ index cc2cc4c537..7e5bdf2ac7 100644
        Effect.scoped,
        Effect.provide(harness.layer),
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index 637b0bc113..c8be030780 100644
+index 81ee76338d..cc607dfada 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
-@@ -1202,6 +1202,9 @@ export const make = Effect.gen(function* () {
+@@ -1204,6 +1204,9 @@ export const make = Effect.gen(function* () {
        options?: { readonly minimumVersion?: string | undefined },
      ) {
        yield* Effect.annotateCurrentSpan({ channel: nextChannel });
@@ -29,10 +29,10 @@ index 637b0bc113..c8be030780 100644
          return yield* new DesktopUpdateChannelManagedError({
            channel: nextChannel,
 diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
-index 362210f96e..20e160eafd 100644
+index 00bdcf6cf5..d985b4801d 100644
 --- a/apps/web/src/components/settings/SettingsPanels.tsx
 +++ b/apps/web/src/components/settings/SettingsPanels.tsx
-@@ -347,6 +347,8 @@ function AboutVersionSection() {
+@@ -352,6 +352,8 @@ function AboutVersionSection() {
                    Review
                  </Button>
                </>
@@ -41,7 +41,7 @@ index 362210f96e..20e160eafd 100644
              ) : (
                "Switches this app and every connected machine whose database the target release supports."
              )
-@@ -355,6 +357,7 @@ function AboutVersionSection() {
+@@ -360,6 +362,7 @@ function AboutVersionSection() {
            control={
              <Select
                value={selectedUpdateChannel}
@@ -49,7 +49,7 @@ index 362210f96e..20e160eafd 100644
                onValueChange={(value) => {
                  if (value !== selectedUpdateChannel) {
                    setSwitchChannel(value as DesktopUpdateChannel);
-@@ -365,7 +368,7 @@ function AboutVersionSection() {
+@@ -370,7 +373,7 @@ function AboutVersionSection() {
                  size="sm"
                  className="w-full sm:w-40"
                  aria-label="Update track"

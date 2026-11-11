@@ -1,0 +1,269 @@
+diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
+index 4808d16401..dc702af8f8 100644
+--- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
++++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
+@@ -85,6 +85,12 @@ import {
+   addCliCommandToPath,
+ } from "./methods/cliCommand.ts";
+ 
++import {
++  getLegacyDatabaseBytes,
++  getLegacyDatabaseSupported,
++  removeLegacyDatabase,
++} from "./methods/legacyDatabase.ts";
++
+ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
+   const ipc = yield* DesktopIpc.DesktopIpc;
+   yield* installNotificationBadge();
+@@ -94,6 +100,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+   yield* ipc.handle(AppActivationIpc.complete);
+   yield* ipc.handle(WebLinksIpc.setReady);
+ 
++  yield* ipc.handleSync(getLegacyDatabaseSupported);
++  yield* ipc.handle(getLegacyDatabaseBytes);
++  yield* ipc.handle(removeLegacyDatabase);
+   yield* ipc.handleSync(takeLegacyLocalStorage);
+   yield* ipc.handle(completeLegacyLocalStorage);
+   yield* ipc.handleSync(getAppBranding);
+diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
+index dceb96e655..55da5a9d8c 100644
+--- a/apps/desktop/src/ipc/channels.ts
++++ b/apps/desktop/src/ipc/channels.ts
+@@ -133,3 +133,7 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
+ export const CANCEL_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:cancel-provider-auth-callback";
+ export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-storage";
+ export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
++
++export const LEGACY_DATABASE_SUPPORTED_CHANNEL = "desktop:legacy-database-supported";
++export const LEGACY_DATABASE_BYTES_CHANNEL = "desktop:legacy-database-bytes";
++export const LEGACY_DATABASE_REMOVE_CHANNEL = "desktop:legacy-database-remove";
+diff --git a/apps/desktop/src/ipc/methods/legacyDatabase.ts b/apps/desktop/src/ipc/methods/legacyDatabase.ts
+new file mode 100644
+index 0000000000..277e1908ca
+--- /dev/null
++++ b/apps/desktop/src/ipc/methods/legacyDatabase.ts
+@@ -0,0 +1,54 @@
++import * as HostProcess from "@t3tools/shared/HostProcess";
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Schema from "effect/Schema";
++
++import * as DesktopEnvironment from "../../app/DesktopEnvironment.ts";
++import { flatpakAppId } from "../../app/Flatpak.ts";
++import * as IpcChannels from "../channels.ts";
++import { makeIpcMethod, makeSyncIpcMethod } from "../DesktopIpc.ts";
++
++// Upstream deletes the database kept from before 0.1.0 only through `t3 doctor`, which the
++// Flatpak does not install. It sits in the app's own data, next to statev2.sqlite.
++const legacyDatabasePath = Effect.map(DesktopEnvironment.DesktopEnvironment, (environment) =>
++  environment.path.join(environment.stateDir, "state.sqlite"),
++);
++
++export const getLegacyDatabaseSupported = makeSyncIpcMethod({
++  channel: IpcChannels.LEGACY_DATABASE_SUPPORTED_CHANNEL,
++  result: Schema.Boolean,
++  handler: Effect.fn("desktop.ipc.legacyDatabase.supported")(function* () {
++    const environment = yield* DesktopEnvironment.DesktopEnvironment;
++    return flatpakAppId(yield* HostProcess.Environment, environment.platform) !== null;
++  }),
++});
++
++export const getLegacyDatabaseBytes = makeIpcMethod({
++  channel: IpcChannels.LEGACY_DATABASE_BYTES_CHANNEL,
++  payload: Schema.Void,
++  result: Schema.NullOr(Schema.Number),
++  handler: Effect.fn("desktop.ipc.legacyDatabase.bytes")(function* () {
++    const fs = yield* FileSystem.FileSystem;
++    return yield* fs.stat(yield* legacyDatabasePath).pipe(
++      Effect.map((info) => Number(info.size)),
++      Effect.orElseSucceed(() => null),
++    );
++  }),
++});
++
++export const removeLegacyDatabase = makeIpcMethod({
++  channel: IpcChannels.LEGACY_DATABASE_REMOVE_CHANNEL,
++  payload: Schema.Void,
++  result: Schema.Void,
++  handler: Effect.fn("desktop.ipc.legacyDatabase.remove")(function* () {
++    const fs = yield* FileSystem.FileSystem;
++    const legacy = yield* legacyDatabasePath;
++    // Only versions before 0.1.0 open it. As upstream does, delete the database before its WAL
++    // so a failed unlink keeps its commits.
++    yield* Effect.forEach(
++      ["", "-wal", "-shm"],
++      (suffix) => fs.remove(legacy + suffix, { force: true }),
++      { discard: true },
++    );
++  }),
++});
+diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
+index 045d6dba29..e19a6c373d 100644
+--- a/apps/desktop/src/preload.ts
++++ b/apps/desktop/src/preload.ts
+@@ -299,6 +299,14 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+   downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
+   installUpdate: (expectedVersion) =>
+     ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL, expectedVersion),
++  ...(ipcRenderer.sendSync(IpcChannels.LEGACY_DATABASE_SUPPORTED_CHANNEL) === true
++    ? {
++        legacyDatabase: {
++          bytes: () => ipcRenderer.invoke(IpcChannels.LEGACY_DATABASE_BYTES_CHANNEL),
++          remove: () => ipcRenderer.invoke(IpcChannels.LEGACY_DATABASE_REMOVE_CHANNEL),
++        },
++      }
++    : {}),
+   cliCommand: {
+     getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
+     install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
+diff --git a/apps/web/src/components/settings/DatabaseStorageNotice.tsx b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
+index b9a0de493a..fee108569f 100644
+--- a/apps/web/src/components/settings/DatabaseStorageNotice.tsx
++++ b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
+@@ -9,7 +9,7 @@ import {
+   type EnvironmentId,
+ } from "@t3tools/contracts";
+ import * as Schema from "effect/Schema";
+-import { type ReactNode, useState } from "react";
++import { type ReactNode, useEffect, useState } from "react";
+ 
+ import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+ import { useLocalStorage } from "../../hooks/useLocalStorage";
+@@ -36,6 +36,7 @@ const reclaimPermissionsAtom = environmentAtomList(
+ );
+ 
+ const formatGiB = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
++const formatMiB = (bytes: number) => `${(bytes / 1024 ** 2).toFixed(0)} MiB`;
+ 
+ /** Offers to reclaim the space on every machine whose database still holds at least 1 GiB of freed pages. */
+ export function DatabaseStorageNotice({
+@@ -54,6 +55,12 @@ export function DatabaseStorageNotice({
+     DismissedEnvironmentIds,
+   );
+   const { copyToClipboard } = useCopyToClipboard({ target: "command" });
++  const legacyDatabase = window.desktopBridge?.legacyDatabase;
++  const [legacyDatabaseBytes, setLegacyDatabaseBytes] = useState<number | null>(null);
++  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads a file size from the desktop app.
++  useEffect(() => {
++    void legacyDatabase?.bytes().then(setLegacyDatabaseBytes);
++  }, [legacyDatabase]);
+   const visible = recommendations
+     .filter((recommendation) => !dismissed.includes(recommendation.environmentId))
+     .map((recommendation) => ({
+@@ -66,17 +73,25 @@ export function DatabaseStorageNotice({
+         recommendation.status.canReclaim === true &&
+         permissions[environmentIds.indexOf(recommendation.environmentId)] === true,
+     }));
+-  if (visible.length === 0) return null;
++  if (visible.length === 0 && legacyDatabaseBytes === null) return null;
+   return (
+     <SettingsSection id="storage-database" title="Database">
+-      <SettingsRow
+-        title="Reclaim freed database space"
+-        description={`These databases still hold space freed by history cleanup.${
+-          visible.every((recommendation) => recommendation.reclaimable)
+-            ? ""
+-            : " Run the command on each machine to reclaim it. It restarts the background service. Quit the desktop app first if it hosts the environment."
+-        }`}
+-      />
++      {legacyDatabase && legacyDatabaseBytes !== null && (
++        <LegacyDatabaseRow
++          bytes={legacyDatabaseBytes}
++          remove={() => legacyDatabase.remove().then(() => setLegacyDatabaseBytes(null))}
++        />
++      )}
++      {visible.length > 0 && (
++        <SettingsRow
++          title="Reclaim freed database space"
++          description={`These databases still hold space freed by history cleanup.${
++            visible.every((recommendation) => recommendation.reclaimable)
++              ? ""
++              : " Run the command on each machine to reclaim it. It restarts the background service. Quit the desktop app first if it hosts the environment."
++          }`}
++        />
++      )}
+       {visible.map(({ environmentId, status, label, reclaimable }) => {
+         const dismiss = (
+           <Button
+@@ -199,3 +214,64 @@ function ReclaimRow({
+     />
+   );
+ }
++
++function LegacyDatabaseRow({
++  bytes,
++  remove,
++}: {
++  readonly bytes: number;
++  readonly remove: () => Promise<void>;
++}) {
++  const [confirming, setConfirming] = useState(false);
++  const [removing, setRemoving] = useState(false);
++  const start = async () => {
++    setConfirming(false);
++    setRemoving(true);
++    try {
++      await remove();
++    } catch (error) {
++      toastManager.add({
++        type: "error",
++        title: "Could not delete the old database",
++        description: error instanceof Error ? error.message : "An error occurred.",
++      });
++    } finally {
++      setRemoving(false);
++    }
++  };
++  return (
++    <SettingsRow
++      title="Database from before 0.1.0"
++      description={`${formatMiB(bytes)} kept for rolling back to versions before 0.1.0.`}
++      control={
++        <>
++          <Button
++            variant="outline"
++            size="xs"
++            disabled={removing}
++            onClick={() => setConfirming(true)}
++          >
++            {removing ? "Deleting…" : "Delete old database"}
++          </Button>
++          <AlertDialog open={confirming} onOpenChange={setConfirming}>
++            <AlertDialogPopup>
++              <AlertDialogHeader>
++                <AlertDialogTitle>Delete the database from before 0.1.0?</AlertDialogTitle>
++                <AlertDialogDescription>
++                  Frees {formatMiB(bytes)}. Your threads and settings are already in the current
++                  database. T3 Code versions before 0.1.0 will start with no threads or settings.
++                </AlertDialogDescription>
++              </AlertDialogHeader>
++              <AlertDialogFooter>
++                <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
++                <Button variant="destructive" onClick={() => void start()}>
++                  Delete database
++                </Button>
++              </AlertDialogFooter>
++            </AlertDialogPopup>
++          </AlertDialog>
++        </>
++      }
++    />
++  );
++}
+diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
+index 29be3d6d02..03b4f4d363 100644
+--- a/packages/contracts/src/ipc.ts
++++ b/packages/contracts/src/ipc.ts
+@@ -1140,6 +1140,12 @@ export interface DesktopBridge {
+   /** With a version, installs only that downloaded build. */
+   installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
+   onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
++  /** The Flatpak desktop's database from before 0.1.0, which it has no `t3 doctor` to delete. */
++  legacyDatabase?: {
++    /** Its size, or null once it is gone. */
++    bytes: () => Promise<number | null>;
++    remove: () => Promise<void>;
++  };
+   cliCommand: {
+     getState: () => Promise<DesktopCliCommandState>;
+     install: () => Promise<DesktopCliCommandState>;

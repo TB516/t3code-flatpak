@@ -21,7 +21,12 @@
   <releases>
     <release version="0.1.8" date="2026-11-09">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.8</url>
-      <description></description>
+      <description>
+        <p>Update to T3 Code 0.1.8.</p>
+        <p>Reclaiming database space now uses T3 Code's own Reclaim button in
+        Settings. Settings still offers to delete the database kept from before
+        0.1.0. Browser import keeps finding your browsers' profiles.</p>
+      </description>
     </release>
     <release version="0.1.7-1" date="2026-11-04">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.7</url>

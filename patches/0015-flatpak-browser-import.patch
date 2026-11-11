@@ -1,0 +1,58 @@
+diff --git a/apps/desktop/src/preview/BrowserImport/Sources.test.ts b/apps/desktop/src/preview/BrowserImport/Sources.test.ts
+index 720a57e64a..8c2eeacfd6 100644
+--- a/apps/desktop/src/preview/BrowserImport/Sources.test.ts
++++ b/apps/desktop/src/preview/BrowserImport/Sources.test.ts
+@@ -199,7 +199,7 @@ describe("chromiumProcessIsAlive", () => {
+ });
+ 
+ describe("isSourceInstalled", () => {
+-  it.effect.each([undefined, "", "relative-config", "relocated", "chrome-override"])(
++  it.effect.each([undefined, "", "relative-config", "relocated", "chrome-override", "flatpak"])(
+     "discovers Linux Chromium profiles with XDG_CONFIG_HOME=%s",
+     (configHome) =>
+       run(
+@@ -210,7 +210,9 @@ describe("isSourceInstalled", () => {
+           const xdgConfigHome =
+             configHome === "relocated" || configHome === "chrome-override"
+               ? path.join(home, "config")
+-              : configHome;
++              : configHome === "flatpak"
++                ? path.join(home, ".var", "app", "com.t3tools.t3code", "config")
++                : configHome;
+           const chromeConfigHome =
+             configHome === "chrome-override" ? path.join(home, ".config") : undefined;
+           const context = yield* sourcePathContext.pipe(
+@@ -218,6 +220,7 @@ describe("isSourceInstalled", () => {
+               HOME: home,
+               XDG_CONFIG_HOME: xdgConfigHome,
+               CHROME_CONFIG_HOME: chromeConfigHome,
++              ...(configHome === "flatpak" ? { FLATPAK_ID: "com.t3tools.t3code" } : {}),
+             }),
+             Effect.provideService(HostProcess.Platform, "linux"),
+           );
+diff --git a/apps/desktop/src/preview/BrowserImport/Sources.ts b/apps/desktop/src/preview/BrowserImport/Sources.ts
+index 20a35752ed..5b62d84841 100644
+--- a/apps/desktop/src/preview/BrowserImport/Sources.ts
++++ b/apps/desktop/src/preview/BrowserImport/Sources.ts
+@@ -10,6 +10,8 @@ import * as Stream from "effect/Stream";
+ import { ChildProcess, ChildProcessSpawner } from "effect/process";
+ import * as SqlClient from "effect/sql/SqlClient";
+ 
++import { flatpakAppId } from "../../app/Flatpak.ts";
++
+ export type BrowserImportEngine = "chromium" | "firefox" | "safari";
+ 
+ export interface BrowserImportPathContext {
+@@ -298,7 +300,11 @@ export const sourcePathContext = Effect.gen(function* () {
+   const platform = yield* HostProcess.Platform;
+   const environment = yield* HostProcess.Environment;
+   const home = environment.HOME ?? environment.USERPROFILE ?? "";
+-  const xdgConfigHome = environment.XDG_CONFIG_HOME;
++  // Flatpak points XDG_CONFIG_HOME at the app's own folder; browser profiles stay in the host's.
++  const xdgConfigHome =
++    flatpakAppId(environment, platform) === null
++      ? environment.XDG_CONFIG_HOME
++      : environment.HOST_XDG_CONFIG_HOME;
+   const linuxConfigHome =
+     xdgConfigHome && path.isAbsolute(xdgConfigHome) ? xdgConfigHome : path.join(home, ".config");
+   const chromeConfigHome = environment.CHROME_CONFIG_HOME;

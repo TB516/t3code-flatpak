@@ -68,7 +68,7 @@ index 58baa160ad..85835f020a 100644
        },
      ),
 diff --git a/apps/server/src/environment/ServerEnvironment.test.ts b/apps/server/src/environment/ServerEnvironment.test.ts
-index 3960b5b8d1..5016da75a2 100644
+index dc719ed93c..bd07d0af2e 100644
 --- a/apps/server/src/environment/ServerEnvironment.test.ts
 +++ b/apps/server/src/environment/ServerEnvironment.test.ts
 @@ -91,7 +91,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
@@ -113,10 +113,10 @@ index 3960b5b8d1..5016da75a2 100644
            settledWorktreeCleanup: true,
            storageCleanupRun: true,
 diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index 0787a3702c..e8edc3cfee 100644
+index 74c6865807..f1df53d13a 100644
 --- a/apps/server/src/environment/ServerEnvironment.ts
 +++ b/apps/server/src/environment/ServerEnvironment.ts
-@@ -201,8 +201,11 @@ export const make = Effect.gen(function* () {
+@@ -203,8 +203,11 @@ export const make = Effect.gen(function* () {
    const serverInstallation = serverSelfUpdate === null ? yield* resolveServerInstallation : null;
    // Desktop and server ship together; a control fd guarantees requestDesktopUpdate support.
  

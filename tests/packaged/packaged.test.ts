@@ -262,18 +262,22 @@ appTest("starts local-only under a host policy despite saved Network access", as
   }
 });
 
-appTest("cleans up the database through host-server.sh", async () => {
-  // CI cannot click the desktop's native confirmation, so this runs the host wrapper
-  // and server command it starts. The desktop also stops its server first.
+appTest("deletes the database from before 0.1.0 in Settings", async () => {
+  // Removing the previous test's policy relaunches the app for Network access, so start fresh.
   await closeApp(page);
   const legacy = path.join(userdata, "state.sqlite");
   fs.copyFileSync(fixtureDatabase, legacy);
-  const result = runInSandbox(
-    fs.readFileSync(path.join(import.meta.dirname, "fixtures/sandbox-database-maintenance.sh"), "utf8"),
-  );
-  assert.equal(result.status, 0, result.output);
-  assert.match(result.output, /Deleted the database from before 0\.1\.0\./);
-  assert.ok(!fs.existsSync(legacy));
+  launchApp();
+  try {
+    await attach();
+    const maintenance = await openSettings(page, "maintenance");
+    await maintenance.getByRole("button", { name: "Delete old database" }).click();
+    await page.getByRole("button", { name: "Delete database" }).click();
+    await maintenance.getByText("Database from before 0.1.0").waitFor({ state: "detached" });
+    assert.ok(!fs.existsSync(legacy));
+  } finally {
+    await closeApp(page);
+  }
 });
 
 appTest("shows Flatpak recovery steps while the host is out of reach, then recovers", async () => {
@@ -286,7 +290,7 @@ appTest("shows Flatpak recovery steps while the host is out of reach, then recov
     startSessionHelper();
   }
   // The desktop keeps retrying its server, so it starts once the host is back. The seeded
-  // thread also shows the history survived the restarts and database maintenance.
+  // thread also shows the history survived the restarts.
   await attach();
   await openSeededThread();
 });

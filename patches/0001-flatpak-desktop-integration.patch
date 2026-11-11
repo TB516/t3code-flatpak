@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/app/DesktopConfig.ts b/apps/desktop/src/app/DesktopConfig.ts
-index 11f975a6b8..586db466b6 100644
+index ef2909045b..98a7852535 100644
 --- a/apps/desktop/src/app/DesktopConfig.ts
 +++ b/apps/desktop/src/app/DesktopConfig.ts
 @@ -37,6 +37,7 @@ export const DesktopConfig = Config.all({
@@ -137,10 +137,10 @@ index cfa8498ae6..4626a2601c 100644
      }
      yield* writeDesktopEntry;
 diff --git a/apps/desktop/src/app/DesktopPreReadyPlatform.test.ts b/apps/desktop/src/app/DesktopPreReadyPlatform.test.ts
-index f2b176ee37..0baac17608 100644
+index 22bfc969c4..da1d29ea71 100644
 --- a/apps/desktop/src/app/DesktopPreReadyPlatform.test.ts
 +++ b/apps/desktop/src/app/DesktopPreReadyPlatform.test.ts
-@@ -60,6 +60,23 @@ vi.mock("node:child_process", () => ({
+@@ -61,6 +61,24 @@ import * as DesktopConfig from "./DesktopConfig.ts";
  import * as DesktopPreReadyPlatform from "./DesktopPreReadyPlatform.ts";
  
  describe("DesktopPreReadyPlatform", () => {
@@ -155,6 +155,7 @@ index f2b176ee37..0baac17608 100644
 +      Effect.provide(
 +        DesktopPreReadyPlatform.layer.pipe(
 +          Layer.provide(Layer.succeed(HostProcess.Platform, "linux")),
++          Layer.provide(DesktopConfig.layerTest({ FLATPAK_ID: "com.t3tools.t3code" })),
 +        ),
 +      ),
 +      Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs())),
@@ -165,25 +166,26 @@ index f2b176ee37..0baac17608 100644
      appendSwitchMock.mockReset();
      getSwitchValueMock.mockReset();
 diff --git a/apps/desktop/src/app/DesktopPreReadyPlatform.ts b/apps/desktop/src/app/DesktopPreReadyPlatform.ts
-index d77544f54b..cbf87853eb 100644
+index ff8c97b8f8..7214f0d672 100644
 --- a/apps/desktop/src/app/DesktopPreReadyPlatform.ts
 +++ b/apps/desktop/src/app/DesktopPreReadyPlatform.ts
-@@ -9,6 +9,7 @@ import * as Layer from "effect/Layer";
- import * as Electron from "electron";
- import * as HostProcess from "@t3tools/shared/HostProcess";
+@@ -56,6 +56,7 @@ const LinuxDesktopEntryConfig = Config.all({
+   xdgDataHome: trimmedString("XDG_DATA_HOME"),
+   launcherPath: trimmedString("T3CODE_DESKTOP_LAUNCHER_PATH"),
+   appImagePath: trimmedString("APPIMAGE"),
++  flatpakId: trimmedString("FLATPAK_ID"),
+ });
  
-+import { flatpakAppId } from "./Flatpak.ts";
- import * as DesktopEarlyElectronStartup from "./DesktopEarlyElectronStartup.ts";
- import { resolveDesktopAppBranding } from "./DesktopEnvironment.ts";
- import { renderUrlHandlerDesktopEntry } from "./DesktopLinuxUrlHandler.ts";
-@@ -75,50 +76,52 @@ export const make = Effect.gen(function* () {
+ /** @public */
+@@ -85,54 +86,56 @@ export const make = Effect.gen(function* () {
        });
        // The portal also requires a valid desktop entry. An AppImage update may
        // have removed the executable referenced by the previous launch's entry.
 -      try {
 -        const applicationsDir = NodePath.posix.join(
--          process.env.XDG_DATA_HOME?.trim() ||
+-          Option.getOrElse(linuxDesktopEntryConfig.xdgDataHome, () =>
 -            NodePath.posix.join(homeDirectory, ".local", "share"),
+-          ),
 -          "applications",
 -        );
 -        NodeFS.mkdirSync(applicationsDir, { recursive: true });
@@ -215,20 +217,16 @@ index d77544f54b..cbf87853eb 100644
 -              appVersion: Electron.app.getVersion(),
 -            }).displayName,
 -            execTarget:
--              process.env.T3CODE_DESKTOP_LAUNCHER_PATH?.trim() ||
--              process.env.APPIMAGE?.trim() ||
--              process.execPath,
--            scheme: ElectronProtocol.getDesktopScheme(linux.isDevelopment),
--            ...(iconPath === undefined ? {} : { iconPath }),
--          }),
--          "utf8",
--        );
--      } catch {}
-+      if (flatpakAppId(process.env, platform) === null) {
+-              Option.getOrUndefined(
+-                Option.orElse(
+-                  linuxDesktopEntryConfig.launcherPath,
+-                  () => linuxDesktopEntryConfig.appImagePath,
++      if (Option.isNone(linuxDesktopEntryConfig.flatpakId)) {
 +        try {
 +          const applicationsDir = NodePath.posix.join(
-+            process.env.XDG_DATA_HOME?.trim() ||
++            Option.getOrElse(linuxDesktopEntryConfig.xdgDataHome, () =>
 +              NodePath.posix.join(homeDirectory, ".local", "share"),
++            ),
 +            "applications",
 +          );
 +          NodeFS.mkdirSync(applicationsDir, { recursive: true });
@@ -247,7 +245,14 @@ index d77544f54b..cbf87853eb 100644
 +                NodePath.posix.join(
 +                  Electron.app.getAppPath(),
 +                  "apps/desktop/prod-resources/icon.png",
-+                ),
+                 ),
+-              ) ?? process.execPath,
+-            scheme: ElectronProtocol.getDesktopScheme(linux.isDevelopment),
+-            ...(iconPath === undefined ? {} : { iconPath }),
+-          }),
+-          "utf8",
+-        );
+-      } catch {}
 +                iconPath,
 +              );
 +            } catch {}
@@ -260,9 +265,12 @@ index d77544f54b..cbf87853eb 100644
 +                appVersion: Electron.app.getVersion(),
 +              }).displayName,
 +              execTarget:
-+                process.env.T3CODE_DESKTOP_LAUNCHER_PATH?.trim() ||
-+                process.env.APPIMAGE?.trim() ||
-+                process.execPath,
++                Option.getOrUndefined(
++                  Option.orElse(
++                    linuxDesktopEntryConfig.launcherPath,
++                    () => linuxDesktopEntryConfig.appImagePath,
++                  ),
++                ) ?? process.execPath,
 +              scheme: ElectronProtocol.getDesktopScheme(linux.isDevelopment),
 +              ...(iconPath === undefined ? {} : { iconPath }),
 +            }),
