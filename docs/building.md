@@ -30,9 +30,9 @@ Build state and output stay in `build-flatpak/`.
 The packaged app checks install a build in a throwaway container, launch it
 headless, and check the places where the sandbox and host meet: the host
 server, agent CLIs found through the login shell, downloads, terminals,
-editors, SSH, Tailscale, managed policy, deleting the old database, and the
-recovery screen when the host is out of reach. Docker runs them by default; set
-`CONTAINER_ENGINE=podman` to use Podman.
+editors, SSH, Tailscale, managed policy, deleting the old database, reclaiming
+database space, and the recovery screen when the host is out of reach. Docker
+runs them by default; set `CONTAINER_ENGINE=podman` to use Podman.
 
 ```sh
 ./scripts/test-packaged                     # the build from ./scripts/build-flatpak build

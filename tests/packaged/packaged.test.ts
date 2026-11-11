@@ -5,6 +5,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { after, before, test } from "node:test";
 import type { Browser, Page } from "playwright-core";
 
@@ -275,6 +276,35 @@ appTest("deletes the database from before 0.1.0 in Settings", async () => {
     await page.getByRole("button", { name: "Delete database" }).click();
     await maintenance.getByText("Database from before 0.1.0").waitFor({ state: "detached" });
     assert.ok(!fs.existsSync(legacy));
+  } finally {
+    await closeApp(page);
+  }
+});
+
+appTest("reclaims database space through the host server's restart", async () => {
+  // Settings offers Reclaim once a database that cannot shrink on its own holds 1 GiB of free pages.
+  const database = path.join(userdata, "statev2.sqlite");
+  const db = new DatabaseSync(database);
+  db.exec(`
+    PRAGMA journal_mode = DELETE;
+    PRAGMA auto_vacuum = NONE;
+    VACUUM;
+    CREATE TABLE reclaim_fill (data BLOB);
+    INSERT INTO reclaim_fill VALUES (zeroblob(400 * 1024 * 1024));
+    INSERT INTO reclaim_fill VALUES (zeroblob(400 * 1024 * 1024));
+    INSERT INTO reclaim_fill VALUES (zeroblob(400 * 1024 * 1024));
+    DROP TABLE reclaim_fill;
+  `);
+  db.close();
+  launchApp();
+  try {
+    await attach();
+    const maintenance = await openSettings(page, "maintenance");
+    await maintenance.getByRole("button", { name: "Reclaim", exact: true }).click();
+    await page.getByRole("button", { name: "Restart and reclaim" }).click();
+    // The server repairs the database after it exits on the host, and the desktop starts it again.
+    await waitUntil("the repaired database", () => fs.statSync(database).size < 100 * 1024 ** 2);
+    await openSeededThread();
   } finally {
     await closeApp(page);
   }
