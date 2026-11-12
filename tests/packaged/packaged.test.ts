@@ -49,8 +49,13 @@ async function attach(urlPrefix?: string) {
 function appTest(name: string, run: () => Promise<void>) {
   test(name, async () => {
     try {
-      // Close anything an earlier failure left open, such as a popover.
-      if (!page.isClosed()) await page.keyboard.press("Escape");
+      // Close anything an earlier test left open, such as a popover or Settings.
+      // Settings navigates back to the page that opened it once it finishes closing,
+      // so wait for that before this test navigates anywhere itself.
+      if (!page.isClosed()) {
+        await page.keyboard.press("Escape");
+        await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
+      }
       await run();
     } catch (error) {
       const file = `${name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`;

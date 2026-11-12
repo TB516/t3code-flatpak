@@ -117,7 +117,7 @@ index 045d6dba29..e19a6c373d 100644
      getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
      install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
 diff --git a/apps/web/src/components/settings/DatabaseStorageNotice.tsx b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
-index b9a0de493a..fee108569f 100644
+index b4668a07f2..ef2f2a38c0 100644
 --- a/apps/web/src/components/settings/DatabaseStorageNotice.tsx
 +++ b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
 @@ -9,7 +9,7 @@ import {
@@ -251,10 +251,10 @@ index b9a0de493a..fee108569f 100644
 +  );
 +}
 diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
-index 29be3d6d02..03b4f4d363 100644
+index 39f96754a6..3632f9fd6b 100644
 --- a/packages/contracts/src/ipc.ts
 +++ b/packages/contracts/src/ipc.ts
-@@ -1140,6 +1140,12 @@ export interface DesktopBridge {
+@@ -1143,6 +1143,12 @@ export interface DesktopBridge {
    /** With a version, installs only that downloaded build. */
    installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
    onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;

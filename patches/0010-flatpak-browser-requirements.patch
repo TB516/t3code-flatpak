@@ -76,10 +76,10 @@ index 1847e5f232..eea911ee35 100644
        // Playwright reports Chrome's refusal to sandbox as root as a sandbox failure too.
        return (yield* HostProcess.UserId) === 0
 diff --git a/apps/server/src/preview/ServerBrowser.ts b/apps/server/src/preview/ServerBrowser.ts
-index 7f128dc5d4..51364a0b16 100644
+index ee31b17cc5..8a0ae2935c 100644
 --- a/apps/server/src/preview/ServerBrowser.ts
 +++ b/apps/server/src/preview/ServerBrowser.ts
-@@ -2759,7 +2759,9 @@ const make = Effect.gen(function* () {
+@@ -2765,7 +2765,9 @@ const make = Effect.gen(function* () {
      (yield* PreviewBrowserHost.sandboxBlocked)
    ) {
      yield* Effect.logWarning(

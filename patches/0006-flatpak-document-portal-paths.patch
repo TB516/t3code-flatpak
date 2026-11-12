@@ -213,10 +213,10 @@ index 4f9ab12edd..8390ff5c88 100644
    pickFiles: Effect.fn("desktop.electron.dialog.pickFiles")(function* (input) {
      const ownerWindowId = Option.match(input.owner, {
 diff --git a/apps/desktop/src/ipc/DesktopIpc.ts b/apps/desktop/src/ipc/DesktopIpc.ts
-index 354acc5a81..e8e89d9502 100644
+index 69d4f70c15..34ba9342ed 100644
 --- a/apps/desktop/src/ipc/DesktopIpc.ts
 +++ b/apps/desktop/src/ipc/DesktopIpc.ts
-@@ -17,7 +17,7 @@ export type DesktopIpcHandleListener = (
+@@ -23,7 +23,7 @@ export type DesktopIpcHandleListener = (
    raw: unknown,
  ) => unknown | Promise<unknown>;
  
@@ -225,7 +225,7 @@ index 354acc5a81..e8e89d9502 100644
  
  export interface DesktopIpcMain {
    removeHandler(channel: string): void;
-@@ -65,7 +65,7 @@ export interface DesktopIpcMethod<E, R> {
+@@ -80,7 +80,7 @@ export interface DesktopIpcMethod<E, R> {
  
  export interface DesktopSyncIpcMethod<E, R> {
    readonly channel: string;
@@ -234,7 +234,7 @@ index 354acc5a81..e8e89d9502 100644
  }
  
  export class DesktopIpc extends Context.Service<
-@@ -127,11 +127,11 @@ export const make = (ipcMain: DesktopIpcMain): DesktopIpc["Service"] =>
+@@ -149,7 +149,7 @@ export const make = (
          Effect.try({
            try: () => {
              ipcMain.removeAllListeners(channel);
@@ -243,6 +243,10 @@ index 354acc5a81..e8e89d9502 100644
                event.returnValue = runSync(
                  Effect.gen(function* () {
                    yield* Effect.annotateCurrentSpan({ channel });
+@@ -158,7 +158,7 @@ export const make = (
+                     yield* Effect.logWarning("Rejected sync IPC from an untrusted sender.");
+                     return undefined;
+                   }
 -                  return yield* handler();
 +                  return yield* handler(payload);
                  }).pipe(
