@@ -36,12 +36,14 @@ build-commands:
     done
 test-rule: ''
 test-commands:
-  # Electron's npm package can use the binary built for this Flatpak.
+  # Electron's npm package uses the binary built for this Flatpak, so the test setup skips its download.
   - ln -s t3code flatpak-output/linux-unpacked/electron
+  - >-
+    ln -s "$PWD/flatpak-output/linux-unpacked"
+    "$(cd apps/desktop && node -p "require('node:path').dirname(require.resolve('electron/package.json'))")/dist"
   # Flatpak identity changes desktop behavior; the upstream suite tests an ordinary host app.
   # The WSL process-liveness tests need host /proc, which is unavailable in this sandbox.
   - >-
-    ELECTRON_OVERRIDE_DIST_PATH=$PWD/flatpak-output/linux-unpacked
     env -u FLATPAK_ID
     pnpm --filter @t3tools/desktop exec vp test run
     --exclude src/wsl/DesktopWslEnvironment.test.ts
