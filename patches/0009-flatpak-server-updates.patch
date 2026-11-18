@@ -1,8 +1,8 @@
 diff --git a/apps/server/src/cloud/selfUpdate.test.ts b/apps/server/src/cloud/selfUpdate.test.ts
-index 6be4288ce3..e22848f9ae 100644
+index 73a7fea4ae..fc10ff6baa 100644
 --- a/apps/server/src/cloud/selfUpdate.test.ts
 +++ b/apps/server/src/cloud/selfUpdate.test.ts
-@@ -196,6 +196,28 @@ it.layer(NodeServices.layer)("server self update", (it) => {
+@@ -240,6 +240,28 @@ it.layer(NodeServices.layer)("server self update", (it) => {
      }),
    );
  
@@ -32,10 +32,10 @@ index 6be4288ce3..e22848f9ae 100644
    it.effect("rejects invalid versions and desktop-managed servers before staging", () =>
      Effect.gen(function* () {
 diff --git a/apps/server/src/cloud/selfUpdate.ts b/apps/server/src/cloud/selfUpdate.ts
-index 5e29996413..505b5e4a11 100644
+index 2c6d04f825..594036634f 100644
 --- a/apps/server/src/cloud/selfUpdate.ts
 +++ b/apps/server/src/cloud/selfUpdate.ts
-@@ -138,6 +138,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+@@ -156,6 +156,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
      mirror?.feedUrl ??
      Option.getOrUndefined(yield* Config.String(CLI_RELEASE_BASE_URL_ENV).pipe(Config.option));
    const inFlight = yield* Ref.make(false);
@@ -43,7 +43,7 @@ index 5e29996413..505b5e4a11 100644
  
    yield* pruneRuntimesOnStart({ baseDir: serverConfig.baseDir, managed: launcher.managed }).pipe(
      Effect.forkScoped,
-@@ -161,6 +162,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+@@ -179,6 +180,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
    const update: ServerSelfUpdate["Service"]["update"] = Effect.fn(
      "cloud.server_self_update.update",
    )(function* (input, reportProgress = () => Effect.void, onHandoffAccepted = () => Effect.void) {
@@ -55,7 +55,7 @@ index 5e29996413..505b5e4a11 100644
      const policyRefusal = managedUpdateRefusal(
        policy.document,
        capability === "boot-service" ? cliReleaseChannelOf(input.targetVersion.trim()) : undefined,
-@@ -333,6 +339,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+@@ -364,6 +370,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
      update,
      commitDesktopUpdate: Effect.fn("ServerSelfUpdate.commitDesktopUpdate")(
        function (requestId, onHandoffAccepted) {
@@ -67,66 +67,3 @@ index 5e29996413..505b5e4a11 100644
          return desktopAppUpdate.commit(requestId, onHandoffAccepted);
        },
      ),
-diff --git a/apps/server/src/environment/ServerEnvironment.test.ts b/apps/server/src/environment/ServerEnvironment.test.ts
-index dc719ed93c..9567631217 100644
---- a/apps/server/src/environment/ServerEnvironment.test.ts
-+++ b/apps/server/src/environment/ServerEnvironment.test.ts
-@@ -91,7 +91,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
-       yield* fs.symlink(entry, `${prefix}/bin/t3`);
-       const config = yield* makeServerConfig(baseDir);
-       yield* fs.makeDirectory(config.stateDir, { recursive: true });
--      for (const mode of ["web", "desktop"] as const) {
-+      for (const { mode, flatpakManaged } of [
-+        { mode: "web", flatpakManaged: false },
-+        { mode: "desktop", flatpakManaged: false },
-+        { mode: "desktop", flatpakManaged: true },
-+      ] as const) {
-         const descriptor = yield* Effect.gen(function* () {
-           const environment = yield* ServerEnvironment.ServerEnvironment;
-           return yield* environment.getDescriptor;
-@@ -99,13 +103,16 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
-           Effect.provide(
-             ServerEnvironment.layer.pipe(
-               Layer.provide(layerEmptySecretStore),
--              Layer.provide(ServerConfig.layer({ ...config, mode })),
-+              Layer.provide(ServerConfig.layer({ ...config, mode, desktopTelemetryControlFd: 5 })),
-             ),
-           ),
-           Effect.provideService(HostProcess.Arguments, ["node", entry]),
-           Effect.provideService(HostProcess.IsExecutable, false),
-           Effect.provideService(HostProcess.Platform, "linux"),
--          Effect.provideService(HostProcess.Environment, {}),
-+          Effect.provideService(
-+            HostProcess.Environment,
-+            flatpakManaged ? { T3CODE_FLATPAK_SERVER: "/installed/flatpak/t3code" } : {},
-+          ),
-         );
-         expect(descriptor.capabilities.serverInstallation).toEqual(
-           mode === "web" ? { kind: "npm-global", prefix } : undefined,
-@@ -113,6 +120,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
-         expect(descriptor.capabilities.serverSelfUpdate).toBe(
-           mode === "web" ? undefined : "desktop-managed",
-         );
-+        expect(descriptor.capabilities.desktopAppUpdate).toBe(
-+          mode === "desktop" && !flatpakManaged ? true : undefined,
-+        );
-         expect(descriptor.capabilities).toMatchObject({
-           settledWorktreeCleanup: true,
-           storageCleanupRun: true,
-diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index 9e29b0fded..ab77356eae 100644
---- a/apps/server/src/environment/ServerEnvironment.ts
-+++ b/apps/server/src/environment/ServerEnvironment.ts
-@@ -203,8 +203,11 @@ export const make = Effect.gen(function* () {
-   const serverInstallation = serverSelfUpdate === null ? yield* resolveServerInstallation : null;
-   // Desktop and server ship together; a control fd guarantees requestDesktopUpdate support.
- 
-+  const flatpakManaged = Boolean((yield* HostProcess.Environment).T3CODE_FLATPAK_SERVER);
-   const desktopAppUpdate =
--    serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
-+    !flatpakManaged &&
-+    serverSelfUpdate === "desktop-managed" &&
-+    serverConfig.desktopTelemetryControlFd !== undefined;
- 
-   const databaseMigration = databaseMigrationHead(serverConfig.dbPath);
-   const descriptor: ExecutionEnvironmentDescriptor = {

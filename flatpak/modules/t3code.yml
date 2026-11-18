@@ -36,12 +36,14 @@ build-commands:
     done
 test-rule: ''
 test-commands:
-  # Electron's npm package can use the binary built for this Flatpak.
+  # Electron's npm package uses the binary built for this Flatpak, so the test setup skips its download.
   - ln -s t3code flatpak-output/linux-unpacked/electron
+  - >-
+    ln -s "$PWD/flatpak-output/linux-unpacked"
+    "$(cd apps/desktop && node -p "require('node:path').dirname(require.resolve('electron/package.json'))")/dist"
   # Flatpak identity changes desktop behavior; the upstream suite tests an ordinary host app.
   # The WSL process-liveness tests need host /proc, which is unavailable in this sandbox.
   - >-
-    ELECTRON_OVERRIDE_DIST_PATH=$PWD/flatpak-output/linux-unpacked
     env -u FLATPAK_ID
     pnpm --filter @t3tools/desktop exec vp test run
     --exclude src/wsl/DesktopWslEnvironment.test.ts
@@ -66,8 +68,8 @@ test-commands:
 sources:
   - type: git
     url: https://github.com/pingdotgg/t3code.git
-    tag: v0.1.9
-    commit: 24e77473ecf41bc1f7142529c7911c1c1aae1d76
+    tag: v0.1.10
+    commit: 7d32075e3757ded707914e2450c3e392a9665765
     x-checker-data:
       type: json
       url: https://api.github.com/repos/pingdotgg/t3code/releases/latest
@@ -91,6 +93,7 @@ sources:
       - ../../patches/0013-flatpak-startup-recovery.patch
       - ../../patches/0014-flatpak-managed-policy.patch
       - ../../patches/0015-flatpak-browser-import.patch
+      - ../../patches/0016-flatpak-prebuilt-pty.patch
     use-git: true
   - type: dir
     path: ../package

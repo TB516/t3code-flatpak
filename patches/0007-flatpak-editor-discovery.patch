@@ -1,10 +1,10 @@
 diff --git a/apps/server/src/process/externalLauncher.test.ts b/apps/server/src/process/externalLauncher.test.ts
-index f59b6a6187..c537ecf929 100644
+index 8ce873733d..edacc8fe36 100644
 --- a/apps/server/src/process/externalLauncher.test.ts
 +++ b/apps/server/src/process/externalLauncher.test.ts
-@@ -290,6 +290,55 @@ it.effect("launches an installed editor with platform-safe arguments", () =>
-   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
- );
+@@ -592,6 +592,55 @@ for (const [replacement, verb, handler, target, expected] of [
+   );
+ }
  
 +it.effect.skipIf(windowsHost)("discovers and launches Flatpak editors without host commands", () =>
 +  Effect.gen(function* () {
@@ -59,10 +59,10 @@ index f59b6a6187..c537ecf929 100644
    "reveals a WSL file in Windows File Explorer through its UNC path",
    () =>
 diff --git a/apps/server/src/process/externalLauncher.ts b/apps/server/src/process/externalLauncher.ts
-index b900823f16..2dc12717ce 100644
+index caa6664a1b..c98b528f59 100644
 --- a/apps/server/src/process/externalLauncher.ts
 +++ b/apps/server/src/process/externalLauncher.ts
-@@ -123,6 +123,67 @@ const CommandLookupEnvConfig = Config.all({
+@@ -124,6 +124,67 @@ const CommandLookupEnvConfig = Config.all({
  const readBrowserLaunchEnv = BrowserLaunchEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
  const readCommandLookupEnv = CommandLookupEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
  
@@ -130,7 +130,7 @@ index b900823f16..2dc12717ce 100644
  function parseTargetPathAndPosition(target: string): Option.Option<TargetPathAndPosition> {
    const match = TARGET_WITH_POSITION_PATTERN.exec(target);
    if (!match?.[1] || !match[2]) {
-@@ -404,6 +465,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+@@ -467,6 +528,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
    FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
  > {
    const available: EditorId[] = [];
@@ -138,7 +138,7 @@ index b900823f16..2dc12717ce 100644
  
    for (const editor of EDITORS) {
      if (editor.commands === null) {
-@@ -414,7 +476,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
+@@ -477,7 +539,7 @@ const buildAvailableEditors = Effect.fn("externalLauncher.buildAvailableEditors"
      }
  
      const command = yield* resolveEditorCommand(editor, env);
@@ -147,23 +147,23 @@ index b900823f16..2dc12717ce 100644
        available.push(editor.id);
      }
    }
-@@ -479,6 +541,19 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
+@@ -559,7 +621,18 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
+   }
+ 
    if (editorDef.commands) {
-     const resolved = yield* resolveEditorCommand(editorDef, env);
-     if (Option.isNone(resolved)) {
+-    const resolved = yield* resolveEditorCommand(editorDef, env);
++    let resolved: Option.Option<{ command: string; baseArgs: ReadonlyArray<string> }> =
++      yield* resolveEditorCommand(editorDef, env);
++    if (Option.isNone(resolved)) {
 +      const appId = installedFlatpakEditorAppId(
 +        editorDef.id,
 +        yield* installedFlatpakAppIds(platform, env),
 +      );
 +      if (appId) {
 +        const baseArgs = "baseArgs" in editorDef ? editorDef.baseArgs : [];
-+        return {
-+          editor: editorDef.id,
-+          target: input.cwd,
-+          command: "flatpak",
-+          args: ["run", appId, ...baseArgs, ...resolveCommandEditorArgs(editorDef, input.cwd)],
-+        };
++        resolved = Option.some({ command: "flatpak", baseArgs: ["run", appId, ...baseArgs] });
 +      }
++    }
+     if (Option.isNone(resolved)) {
        return yield* new ExternalLauncherCommandNotFoundError({
          editor: editorDef.id,
-         command: editorDef.commands[0],

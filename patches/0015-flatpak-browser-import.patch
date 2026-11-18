@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/preview/BrowserImport/Sources.test.ts b/apps/desktop/src/preview/BrowserImport/Sources.test.ts
-index 720a57e64a..8c2eeacfd6 100644
+index 9b2c3cb26c..5b924a1fa0 100644
 --- a/apps/desktop/src/preview/BrowserImport/Sources.test.ts
 +++ b/apps/desktop/src/preview/BrowserImport/Sources.test.ts
 @@ -199,7 +199,7 @@ describe("chromiumProcessIsAlive", () => {
@@ -31,7 +31,7 @@ index 720a57e64a..8c2eeacfd6 100644
              Effect.provideService(HostProcess.Platform, "linux"),
            );
 diff --git a/apps/desktop/src/preview/BrowserImport/Sources.ts b/apps/desktop/src/preview/BrowserImport/Sources.ts
-index 20a35752ed..5b62d84841 100644
+index 6ecd546a1a..fb4ad15e4a 100644
 --- a/apps/desktop/src/preview/BrowserImport/Sources.ts
 +++ b/apps/desktop/src/preview/BrowserImport/Sources.ts
 @@ -10,6 +10,8 @@ import * as Stream from "effect/Stream";
