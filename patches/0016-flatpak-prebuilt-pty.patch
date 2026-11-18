@@ -1,0 +1,14 @@
+diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
+index 9d34e2412b..7ee4653f4f 100644
+--- a/scripts/build-desktop-artifact.ts
++++ b/scripts/build-desktop-artifact.ts
+@@ -2911,6 +2911,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
+   if (platform === "linux") {
+     // Pin the static AppImage runtime so hosts with only FUSE 3 do not need libfuse2.
+     buildConfig.toolsets = { appimage: "1.0.3" };
++    // The Flatpak's host server loads node-pty, so its SDK-built glibc needs must not leak in.
++    // node-pty's own N-API prebuild targets glibc 2.28 and loads under Electron.
++    if (process.env.FLATPAK_ID) buildConfig.npmRebuild = false;
+     const path = yield* Path.Path;
+     const repoRoot = yield* RepoRoot;
+     buildConfig.afterPack = path.join(repoRoot, "scripts/linux-after-pack.ts");

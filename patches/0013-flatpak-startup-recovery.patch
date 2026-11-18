@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/app/DesktopStartupRecovery.ts b/apps/desktop/src/app/DesktopStartupRecovery.ts
-index c8228183aa..ab23819f60 100644
+index 769a30cf76..09d1708fbc 100644
 --- a/apps/desktop/src/app/DesktopStartupRecovery.ts
 +++ b/apps/desktop/src/app/DesktopStartupRecovery.ts
 @@ -17,6 +17,7 @@ import type { BackendStartupFailure } from "../backend/DesktopBackendManager.ts"

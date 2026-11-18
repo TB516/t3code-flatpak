@@ -253,31 +253,31 @@ index 69d4f70c15..34ba9342ed 100644
                    Effect.annotateLogs({ channel }),
                    Effect.withSpan("desktop.ipc.invokeSync"),
 diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-index 6a1b1c62e7..4808d16401 100644
+index 60b72deb29..d694fcffda 100644
 --- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
 +++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-@@ -50,6 +50,7 @@ import {
-   revealWindow,
+@@ -53,6 +53,7 @@ import {
    pickFolder,
+   toLocalBackendPath,
    pickProjectFavicon,
 +  resolveHostPath,
    pickThemeFiles,
    setTheme,
    syncHtmlFullscreen,
-@@ -99,6 +100,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
-   yield* installRelayTelemetryEnabled();
+@@ -103,6 +104,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
    yield* ipc.handleSync(getSystemLocale);
    yield* ipc.handleSync(getPreferredSystemLanguages);
+   yield* ipc.handleSync(getPrimaryPasteEnabled);
 +  yield* ipc.handleSync(resolveHostPath);
    yield* ipc.handleSync(getWindowFullscreenState);
    yield* ipc.handleSync(getLocalEnvironmentBootstraps);
    yield* ipc.handleSync(getLocalEnvironmentEnabled);
 diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
-index aebbc1c24f..dceb96e655 100644
+index 9e5c7296a3..d0dcdda19e 100644
 --- a/apps/desktop/src/ipc/channels.ts
 +++ b/apps/desktop/src/ipc/channels.ts
-@@ -1,6 +1,7 @@
- export const PICK_FOLDER_CHANNEL = "desktop:pick-folder";
+@@ -2,6 +2,7 @@ export const PICK_FOLDER_CHANNEL = "desktop:pick-folder";
+ export const TO_LOCAL_BACKEND_PATH_CHANNEL = "desktop:to-local-backend-path";
  export const SET_NOTIFICATION_BADGE_CHANNEL = "desktop:set-notification-badge";
  export const PICK_PROJECT_FAVICON_CHANNEL = "desktop:pick-project-favicon";
 +export const RESOLVE_HOST_PATH_CHANNEL = "desktop:resolve-host-path";
@@ -285,10 +285,10 @@ index aebbc1c24f..dceb96e655 100644
  export const SET_THEME_CHANNEL = "desktop:set-theme";
  export const CONTEXT_MENU_CHANNEL = "desktop:context-menu";
 diff --git a/apps/desktop/src/ipc/methods/window.ts b/apps/desktop/src/ipc/methods/window.ts
-index e0eea5c74c..2fd7c294de 100644
+index 38887ec71d..5ae8d79387 100644
 --- a/apps/desktop/src/ipc/methods/window.ts
 +++ b/apps/desktop/src/ipc/methods/window.ts
-@@ -276,10 +276,26 @@ export const pickProjectFavicon = DesktopIpc.makeIpcMethod({
+@@ -314,10 +314,26 @@ export const pickProjectFavicon = DesktopIpc.makeIpcMethod({
          },
        ],
      });
@@ -317,10 +317,10 @@ index e0eea5c74c..2fd7c294de 100644
    channel: IpcChannels.SET_THEME_CHANNEL,
    payload: DesktopThemeSchema,
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index 2dbc4eeda3..045d6dba29 100644
+index ba9c17aae2..26daa80b0c 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
-@@ -95,7 +95,13 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+@@ -113,7 +113,13 @@ contextBridge.exposeInMainWorld("desktopBridge", {
    },
    getRelayTelemetryEnabled: () =>
      ipcRenderer.sendSync(IpcChannels.GET_RELAY_TELEMETRY_ENABLED_CHANNEL) === true,
@@ -333,5 +333,5 @@ index 2dbc4eeda3..045d6dba29 100644
 +    return typeof hostPath === "string" ? hostPath : "";
 +  },
    getClientPlatform: () => clientPlatform,
+   restartAudioService: () => ipcRenderer.invoke(IpcChannels.RESTART_AUDIO_SERVICE_CHANNEL),
    setNotificationBadge: (badge) =>
-     ipcRenderer.invoke(IpcChannels.SET_NOTIFICATION_BADGE_CHANNEL, badge),

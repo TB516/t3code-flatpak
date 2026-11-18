@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-index 4808d16401..dc702af8f8 100644
+index d694fcffda..8db7250c73 100644
 --- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
 +++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-@@ -85,6 +85,12 @@ import {
+@@ -88,6 +88,12 @@ import {
    addCliCommandToPath,
  } from "./methods/cliCommand.ts";
  
@@ -15,7 +15,7 @@ index 4808d16401..dc702af8f8 100644
  export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
    const ipc = yield* DesktopIpc.DesktopIpc;
    yield* installNotificationBadge();
-@@ -94,6 +100,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+@@ -97,6 +103,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
    yield* ipc.handle(AppActivationIpc.complete);
    yield* ipc.handle(WebLinksIpc.setReady);
  
@@ -26,14 +26,13 @@ index 4808d16401..dc702af8f8 100644
    yield* ipc.handle(completeLegacyLocalStorage);
    yield* ipc.handleSync(getAppBranding);
 diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
-index dceb96e655..55da5a9d8c 100644
+index d0dcdda19e..3019fd1a5d 100644
 --- a/apps/desktop/src/ipc/channels.ts
 +++ b/apps/desktop/src/ipc/channels.ts
-@@ -133,3 +133,7 @@ export const RECEIVE_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:receive-provider-
- export const CANCEL_PROVIDER_AUTH_CALLBACK_CHANNEL = "desktop:cancel-provider-auth-callback";
- export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-storage";
+@@ -143,3 +143,6 @@ export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-stor
  export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
-+
+ 
+ export const RESTART_AUDIO_SERVICE_CHANNEL = "desktop:restart-audio-service";
 +export const LEGACY_DATABASE_SUPPORTED_CHANNEL = "desktop:legacy-database-supported";
 +export const LEGACY_DATABASE_BYTES_CHANNEL = "desktop:legacy-database-bytes";
 +export const LEGACY_DATABASE_REMOVE_CHANNEL = "desktop:legacy-database-remove";
@@ -98,10 +97,10 @@ index 0000000000..277e1908ca
 +  }),
 +});
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index 045d6dba29..e19a6c373d 100644
+index 26daa80b0c..da11ebbd0a 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
-@@ -299,6 +299,14 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+@@ -333,6 +333,14 @@ contextBridge.exposeInMainWorld("desktopBridge", {
    downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
    installUpdate: (expectedVersion) =>
      ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL, expectedVersion),
@@ -251,10 +250,10 @@ index b4668a07f2..ef2f2a38c0 100644
 +  );
 +}
 diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
-index 39f96754a6..3632f9fd6b 100644
+index 25339cb321..cd6cbdc39e 100644
 --- a/packages/contracts/src/ipc.ts
 +++ b/packages/contracts/src/ipc.ts
-@@ -1143,6 +1143,12 @@ export interface DesktopBridge {
+@@ -1175,6 +1175,12 @@ export interface DesktopBridge {
    /** With a version, installs only that downloaded build. */
    installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
    onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;

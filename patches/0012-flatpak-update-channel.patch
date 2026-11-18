@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index 1b14a0497b..d5191e550c 100644
+index 44777e1c70..3187bf1b8b 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
-@@ -92,6 +92,11 @@ describe("DesktopUpdates", () => {
+@@ -95,6 +95,11 @@ describe("DesktopUpdates", () => {
        const result = yield* updates.check("manual");
        assert.isFalse(result.checked);
        assert.equal(harness.checkCount(), 0);
@@ -15,10 +15,10 @@ index 1b14a0497b..d5191e550c 100644
        Effect.scoped,
        Effect.provide(harness.layer),
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index 75ef423a27..a70eb7d771 100644
+index 3ca3eacfce..a0a883b14e 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
-@@ -1208,6 +1208,9 @@ export const make = Effect.gen(function* () {
+@@ -1347,6 +1347,9 @@ export const make = Effect.gen(function* () {
        options?: { readonly minimumVersion?: string | undefined },
      ) {
        yield* Effect.annotateCurrentSpan({ channel: nextChannel });
@@ -29,10 +29,10 @@ index 75ef423a27..a70eb7d771 100644
          return yield* new DesktopUpdateChannelManagedError({
            channel: nextChannel,
 diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
-index 3dc9566e89..fcace2f695 100644
+index 633e18a567..ebd285182d 100644
 --- a/apps/web/src/components/settings/SettingsPanels.tsx
 +++ b/apps/web/src/components/settings/SettingsPanels.tsx
-@@ -356,6 +356,8 @@ function AboutVersionSection() {
+@@ -359,6 +359,8 @@ function AboutVersionSection() {
                    Review
                  </Button>
                </>
@@ -41,7 +41,7 @@ index 3dc9566e89..fcace2f695 100644
              ) : (
                "Switches this app and every connected machine whose database the target release supports."
              )
-@@ -364,6 +366,9 @@ function AboutVersionSection() {
+@@ -367,6 +369,9 @@ function AboutVersionSection() {
            control={
              <Select
                value={selectedUpdateChannel}
@@ -51,7 +51,7 @@ index 3dc9566e89..fcace2f695 100644
                onValueChange={(value) => {
                  if (value !== selectedUpdateChannel) {
                    setSwitchChannel(value as DesktopUpdateChannel);
-@@ -374,7 +379,9 @@ function AboutVersionSection() {
+@@ -377,7 +382,9 @@ function AboutVersionSection() {
                  size="sm"
                  className="w-full sm:w-40"
                  aria-label="Update track"
