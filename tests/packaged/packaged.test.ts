@@ -65,9 +65,19 @@ function appTest(name: string, run: () => Promise<void>) {
   });
 }
 
-async function openSeededThread() {
+/** Opens a thread from the sidebar of a freshly loaded start page. */
+async function openThread(title: string) {
   await page.goto("t3code://app/#/");
-  await page.locator("li[data-thread-item]", { hasText: FIXTURE_THREAD }).click();
+  // The start page replaces itself with a new-thread draft, and while that settles the app
+  // sends an early thread click back to the draft. Click until the thread stays open.
+  await waitUntil(`the "${title}" thread to open`, async () => {
+    await page.locator("li[data-thread-item]", { hasText: title }).click();
+    return !/#\/(draft\/[^/]*)?$/.test(page.url());
+  });
+}
+
+async function openSeededThread() {
+  await openThread(FIXTURE_THREAD);
   await page.getByText(FIXTURE_MESSAGE).waitFor();
 }
 
@@ -96,7 +106,10 @@ appTest("finds agent CLIs that only the host login shell knows", async () => {
   });
   const calls = hostCalls();
   assert.ok(calls.includes("claude --version"), calls.join("\n"));
-  assert.ok(calls.includes("codex app-server"), calls.join("\n"));
+  assert.ok(
+    calls.some((call) => call.startsWith("codex app-server")),
+    calls.join("\n"),
+  );
 });
 
 appTest("leaves updates to Flatpak and offers no host installs", async () => {
@@ -173,8 +186,7 @@ appTest("runs a free agent turn on the host and shows it", async () => {
     "thread", "start", "--base-dir", baseDir, "--title", "Host tour",
     "--provider", "replay", "--model", "showcase", hostRepo, "Give me the tour",
   ]);
-  await page.goto("t3code://app/#/");
-  await page.locator("li[data-thread-item]", { hasText: "Host tour" }).click();
+  await openThread("Host tour");
   await page.getByText("and the tests pass").first().waitFor({ timeout: 90_000 });
 });
 
@@ -205,7 +217,7 @@ appTest("opens the project in editors on the host PATH and installed as Flatpaks
   await page.keyboard.press("Escape");
   await waitUntil("both editors to open the project", () => {
     const calls = hostCalls();
-    return calls.includes(`code ${hostRepo}`) && calls.includes(`zed ${hostRepo}`);
+    return calls.includes(`code --new-window ${hostRepo}`) && calls.includes(`zed ${hostRepo}`);
   });
 });
 
