@@ -40,6 +40,10 @@ jobs:
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
+      # Updating a runtime that ships in the image fails with "Invalid cross-device link" on the
+      # image's layered filesystem. A volume starts as a copy of the image's installation.
+      volumes:
+        - /var/lib/flatpak
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -47,6 +51,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      # flatpak-builder copies its cached git mirrors right after fetching them, while a
+      # background `git gc` could still be repacking them.
+      - name: Run git gc before fetches return
+        run: git config --global gc.autoDetach false
 
       - name: Import repository signing key
         id: signing
