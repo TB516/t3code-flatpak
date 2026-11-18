@@ -52,6 +52,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      # flatpak-builder copies its cached git mirrors right after fetching them, while a
+      # background `git gc` could still be repacking them.
+      - name: Run git gc before fetches return
+        run: git config --global gc.autoDetach false
+
       - name: Import repository signing key
         id: signing
         uses: crazy-max/ghaction-import-gpg@v7

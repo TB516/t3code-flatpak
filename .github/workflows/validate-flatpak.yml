@@ -54,6 +54,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      # flatpak-builder copies its cached git mirrors right after fetching them, while a
+      # background `git gc` could still be repacking them.
+      - name: Run git gc before fetches return
+        run: git config --global gc.autoDetach false
+
       - name: Build and test Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
