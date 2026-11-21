@@ -94,6 +94,7 @@ sources:
       - ../../patches/0014-flatpak-managed-policy.patch
       - ../../patches/0015-flatpak-browser-import.patch
       - ../../patches/0016-flatpak-prebuilt-pty.patch
+      - ../../patches/0017-flatpak-primary-paste.patch
     use-git: true
   - type: dir
     path: ../package

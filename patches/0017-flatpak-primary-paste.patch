@@ -1,0 +1,89 @@
+diff --git a/apps/desktop/src/app/DesktopPrimaryPaste.test.ts b/apps/desktop/src/app/DesktopPrimaryPaste.test.ts
+index 07ef1b8dad..1fb9bde434 100644
+--- a/apps/desktop/src/app/DesktopPrimaryPaste.test.ts
++++ b/apps/desktop/src/app/DesktopPrimaryPaste.test.ts
+@@ -46,10 +46,11 @@ const notFound = PlatformError.systemError({
+ const read = (
+   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+   desktop = "ubuntu:GNOME",
++  env: NodeJS.ProcessEnv = {},
+ ) =>
+   readGtkPrimaryPasteEnabled.pipe(
+     Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+-    Effect.provideService(HostProcess.Environment, { XDG_CURRENT_DESKTOP: desktop }),
++    Effect.provideService(HostProcess.Environment, { ...env, XDG_CURRENT_DESKTOP: desktop }),
+   );
+ 
+ describe("readGtkPrimaryPasteEnabled", () => {
+@@ -85,6 +86,22 @@ describe("readGtkPrimaryPasteEnabled", () => {
+     }),
+   );
+ 
++  it.effect("in Flatpak, reads GNOME's value through the settings portal", () =>
++    Effect.gen(function* () {
++      const flatpak = { FLATPAK_ID: "com.t3tools.t3code" };
++      // The sandbox's gsettings reports the runtime's schema default, not the host's value.
++      const portal = (value: string) =>
++        spawnerWithStdout((command) =>
++          command === "gdbus"
++            ? Stream.make(encoder.encode(`(<${value}>,)\n`))
++            : Stream.make(encoder.encode("false\n")),
++        );
++      assert.isTrue(yield* read(portal("true"), "GNOME", flatpak));
++      assert.isFalse(yield* read(portal("false"), "GNOME", flatpak));
++      assert.isTrue(yield* read(portal("false"), "niri", flatpak));
++    }),
++  );
++
+   it.effect("stays enabled when gsettings cannot run", () =>
+     Effect.gen(function* () {
+       const missing = ChildProcessSpawner.make(() => Effect.fail(notFound));
+diff --git a/apps/desktop/src/app/DesktopPrimaryPaste.ts b/apps/desktop/src/app/DesktopPrimaryPaste.ts
+index 2c7aa59a79..bad26db0cf 100644
+--- a/apps/desktop/src/app/DesktopPrimaryPaste.ts
++++ b/apps/desktop/src/app/DesktopPrimaryPaste.ts
+@@ -5,6 +5,8 @@ import * as Layer from "effect/Layer";
+ import * as ChildProcess from "effect/process/ChildProcess";
+ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+ 
++import { flatpakAppId } from "./Flatpak.ts";
++
+ export class DesktopPrimaryPaste extends Context.Service<
+   DesktopPrimaryPaste,
+   {
+@@ -26,11 +28,34 @@ const dconfQuery = ChildProcess.make(
+   ["read", "/org/gnome/desktop/interface/gtk-enable-primary-paste"],
+   { stdin: "ignore", stderr: "ignore" },
+ );
++// Flatpak's gsettings sees only schema defaults; the settings portal reads the host's value.
++const portalQuery = ChildProcess.make(
++  "gdbus",
++  [
++    "call",
++    "--session",
++    "--dest",
++    "org.freedesktop.portal.Desktop",
++    "--object-path",
++    "/org/freedesktop/portal/desktop",
++    "--method",
++    "org.freedesktop.portal.Settings.ReadOne",
++    "org.gnome.desktop.interface",
++    "gtk-enable-primary-paste",
++  ],
++  { stdin: "ignore", stderr: "ignore" },
++);
+ 
+ export const readGtkPrimaryPasteEnabled = Effect.gen(function* () {
+   const env = yield* HostProcess.Environment;
+   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+-  const output = yield* env.XDG_CURRENT_DESKTOP?.split(":").includes("GNOME")
++  const gnome = env.XDG_CURRENT_DESKTOP?.split(":").includes("GNOME");
++  if (flatpakAppId(env, "linux") !== null) {
++    // Outside GNOME an unset key means enabled, and the portal cannot tell unset from false.
++    if (!gnome) return true;
++    return !(yield* spawner.string(portalQuery)).includes("<false>");
++  }
++  const output = yield* gnome
+     ? spawner.string(gsettingsQuery)
+     : spawner.string(dconfQuery).pipe(Effect.catch(() => spawner.string(gsettingsQuery)));
+   return output.trim() !== "false";
