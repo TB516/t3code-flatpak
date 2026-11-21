@@ -29,19 +29,19 @@ index 3ca3eacfce..a0a883b14e 100644
          return yield* new DesktopUpdateChannelManagedError({
            channel: nextChannel,
 diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
-index 633e18a567..ebd285182d 100644
+index e0a1241784..638d8c178a 100644
 --- a/apps/web/src/components/settings/SettingsPanels.tsx
 +++ b/apps/web/src/components/settings/SettingsPanels.tsx
-@@ -359,6 +359,8 @@ function AboutVersionSection() {
-                   Review
+@@ -389,6 +389,8 @@ function AboutVersionSection() {
+                   <T>Review</T>
                  </Button>
                </>
 +            ) : updateState?.enabled === false ? (
-+              (updateState.message ?? "Updates are unavailable.")
++              (updateState.message ?? gt("Updates are unavailable."))
              ) : (
-               "Switches this app and every connected machine whose database the target release supports."
-             )
-@@ -367,6 +369,9 @@ function AboutVersionSection() {
+               gt(
+                 "Switches this app and every connected machine whose database the target release supports.",
+@@ -399,6 +401,9 @@ function AboutVersionSection() {
            control={
              <Select
                value={selectedUpdateChannel}
@@ -51,14 +51,14 @@ index 633e18a567..ebd285182d 100644
                onValueChange={(value) => {
                  if (value !== selectedUpdateChannel) {
                    setSwitchChannel(value as DesktopUpdateChannel);
-@@ -377,7 +382,9 @@ function AboutVersionSection() {
+@@ -409,7 +414,9 @@ function AboutVersionSection() {
                  size="sm"
                  className="w-full sm:w-40"
-                 aria-label="Update track"
+                 aria-label={gt("Update track")}
 -                disabled={switchChannel !== null || updateRun !== null}
 +                disabled={
 +                  switchChannel !== null || updateRun !== null || updateState?.enabled !== true
 +                }
                >
-                 <SelectValue>{channelSwitchLabel(selectedUpdateChannel)}</SelectValue>
+                 <SelectValue>{channelSwitchLabel(selectedUpdateChannel, messages)}</SelectValue>
                </SelectTrigger>

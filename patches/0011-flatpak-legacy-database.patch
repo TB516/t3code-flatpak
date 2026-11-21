@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-index d694fcffda..8db7250c73 100644
+index a045fd5853..12c0cca32c 100644
 --- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
 +++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-@@ -88,6 +88,12 @@ import {
+@@ -89,6 +89,12 @@ import {
    addCliCommandToPath,
  } from "./methods/cliCommand.ts";
  
@@ -15,7 +15,7 @@ index d694fcffda..8db7250c73 100644
  export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
    const ipc = yield* DesktopIpc.DesktopIpc;
    yield* installNotificationBadge();
-@@ -97,6 +103,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+@@ -98,6 +104,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
    yield* ipc.handle(AppActivationIpc.complete);
    yield* ipc.handle(WebLinksIpc.setReady);
  
@@ -26,16 +26,18 @@ index d694fcffda..8db7250c73 100644
    yield* ipc.handle(completeLegacyLocalStorage);
    yield* ipc.handleSync(getAppBranding);
 diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
-index d0dcdda19e..3019fd1a5d 100644
+index 82d966d9c0..f2fcfbb5e0 100644
 --- a/apps/desktop/src/ipc/channels.ts
 +++ b/apps/desktop/src/ipc/channels.ts
-@@ -143,3 +143,6 @@ export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-stor
+@@ -150,5 +150,8 @@ export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-stor
  export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
  
  export const RESTART_AUDIO_SERVICE_CHANNEL = "desktop:restart-audio-service";
 +export const LEGACY_DATABASE_SUPPORTED_CHANNEL = "desktop:legacy-database-supported";
 +export const LEGACY_DATABASE_BYTES_CHANNEL = "desktop:legacy-database-bytes";
 +export const LEGACY_DATABASE_REMOVE_CHANNEL = "desktop:legacy-database-remove";
+ 
+ export const START_FILE_DRAG_CHANNEL = "desktop:start-file-drag";
 diff --git a/apps/desktop/src/ipc/methods/legacyDatabase.ts b/apps/desktop/src/ipc/methods/legacyDatabase.ts
 new file mode 100644
 index 0000000000..277e1908ca
@@ -97,10 +99,10 @@ index 0000000000..277e1908ca
 +  }),
 +});
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index 26daa80b0c..da11ebbd0a 100644
+index fef6236db0..495f0aa3a1 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
-@@ -333,6 +333,14 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+@@ -336,6 +336,14 @@ contextBridge.exposeInMainWorld("desktopBridge", {
    downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
    installUpdate: (expectedVersion) =>
      ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL, expectedVersion),
@@ -116,19 +118,19 @@ index 26daa80b0c..da11ebbd0a 100644
      getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
      install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
 diff --git a/apps/web/src/components/settings/DatabaseStorageNotice.tsx b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
-index b4668a07f2..ef2f2a38c0 100644
+index b4458c389d..bab711b45a 100644
 --- a/apps/web/src/components/settings/DatabaseStorageNotice.tsx
 +++ b/apps/web/src/components/settings/DatabaseStorageNotice.tsx
-@@ -9,7 +9,7 @@ import {
-   type EnvironmentId,
+@@ -12,7 +12,7 @@ import {
  } from "@t3tools/contracts";
  import * as Schema from "effect/Schema";
+ import { msg, T, useGT, Var } from "gt-react";
 -import { type ReactNode, useState } from "react";
 +import { type ReactNode, useEffect, useState } from "react";
  
  import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
  import { useLocalStorage } from "../../hooks/useLocalStorage";
-@@ -36,6 +36,7 @@ const reclaimPermissionsAtom = environmentAtomList(
+@@ -39,6 +39,7 @@ const reclaimPermissionsAtom = environmentAtomList(
  );
  
  const formatGiB = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
@@ -136,10 +138,10 @@ index b4668a07f2..ef2f2a38c0 100644
  
  /** Offers to reclaim the space on every machine whose database still holds at least 1 GiB of freed pages. */
  export function DatabaseStorageNotice({
-@@ -54,6 +55,12 @@ export function DatabaseStorageNotice({
-     DismissedEnvironmentIds,
-   );
-   const { copyToClipboard } = useCopyToClipboard({ target: "command" });
+@@ -64,6 +65,12 @@ export function DatabaseStorageNotice({
+       failureMessage: msg("Failed to copy command to the clipboard."),
+     },
+   });
 +  const legacyDatabase = window.desktopBridge?.legacyDatabase;
 +  const [legacyDatabaseBytes, setLegacyDatabaseBytes] = useState<number | null>(null);
 +  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads a file size from the desktop app.
@@ -149,21 +151,23 @@ index b4668a07f2..ef2f2a38c0 100644
    const visible = recommendations
      .filter((recommendation) => !dismissed.includes(recommendation.environmentId))
      .map((recommendation) => ({
-@@ -66,17 +73,25 @@ export function DatabaseStorageNotice({
+@@ -76,19 +83,27 @@ export function DatabaseStorageNotice({
          recommendation.status.canReclaim === true &&
          permissions[environmentIds.indexOf(recommendation.environmentId)] === true,
      }));
 -  if (visible.length === 0) return null;
 +  if (visible.length === 0 && legacyDatabaseBytes === null) return null;
    return (
-     <SettingsSection id="storage-database" title="Database">
+     <SettingsSection id="storage-database" title={gt("Database")}>
 -      <SettingsRow
--        title="Reclaim freed database space"
--        description={`These databases still hold space freed by history cleanup.${
+-        title={gt("Reclaim freed database space")}
+-        description={
 -          visible.every((recommendation) => recommendation.reclaimable)
--            ? ""
--            : " Run the command on each machine to reclaim it. It restarts the background service. Quit the desktop app first if it hosts the environment."
--        }`}
+-            ? gt("These databases still hold space freed by history cleanup.")
+-            : gt(
+-                "These databases still hold space freed by history cleanup. Run the command on each machine to reclaim it. It restarts the background service. Quit the desktop app first if it hosts the environment.",
+-              )
+-        }
 -      />
 +      {legacyDatabase && legacyDatabaseBytes !== null && (
 +        <LegacyDatabaseRow
@@ -173,18 +177,20 @@ index b4668a07f2..ef2f2a38c0 100644
 +      )}
 +      {visible.length > 0 && (
 +        <SettingsRow
-+          title="Reclaim freed database space"
-+          description={`These databases still hold space freed by history cleanup.${
++          title={gt("Reclaim freed database space")}
++          description={
 +            visible.every((recommendation) => recommendation.reclaimable)
-+              ? ""
-+              : " Run the command on each machine to reclaim it. It restarts the background service. Quit the desktop app first if it hosts the environment."
-+          }`}
++              ? gt("These databases still hold space freed by history cleanup.")
++              : gt(
++                  "These databases still hold space freed by history cleanup. Run the command on each machine to reclaim it. It restarts the background service. Quit the desktop app first if it hosts the environment.",
++                )
++          }
 +        />
 +      )}
        {visible.map(({ environmentId, status, label, reclaimable }) => {
          const dismiss = (
            <Button
-@@ -199,3 +214,64 @@ function ReclaimRow({
+@@ -229,3 +244,72 @@ function ReclaimRow({
      />
    );
  }
@@ -196,8 +202,10 @@ index b4668a07f2..ef2f2a38c0 100644
 +  readonly bytes: number;
 +  readonly remove: () => Promise<void>;
 +}) {
++  const gt = useGT();
 +  const [confirming, setConfirming] = useState(false);
 +  const [removing, setRemoving] = useState(false);
++  const amount = formatMiB(bytes);
 +  const start = async () => {
 +    setConfirming(false);
 +    setRemoving(true);
@@ -206,8 +214,8 @@ index b4668a07f2..ef2f2a38c0 100644
 +    } catch (error) {
 +      toastManager.add({
 +        type: "error",
-+        title: "Could not delete the old database",
-+        description: error instanceof Error ? error.message : "An error occurred.",
++        title: gt("Could not delete the old database"),
++        description: error instanceof Error ? error.message : gt("An error occurred."),
 +      });
 +    } finally {
 +      setRemoving(false);
@@ -215,8 +223,8 @@ index b4668a07f2..ef2f2a38c0 100644
 +  };
 +  return (
 +    <SettingsRow
-+      title="Database from before 0.1.0"
-+      description={`${formatMiB(bytes)} kept for rolling back to versions before 0.1.0.`}
++      title={gt("Database from before 0.1.0")}
++      description={gt("{amount} kept for rolling back to versions before 0.1.0.", { amount })}
 +      control={
 +        <>
 +          <Button
@@ -225,21 +233,27 @@ index b4668a07f2..ef2f2a38c0 100644
 +            disabled={removing}
 +            onClick={() => setConfirming(true)}
 +          >
-+            {removing ? "Deleting…" : "Delete old database"}
++            {removing ? gt("Deleting…") : gt("Delete old database")}
 +          </Button>
 +          <AlertDialog open={confirming} onOpenChange={setConfirming}>
 +            <AlertDialogPopup>
 +              <AlertDialogHeader>
-+                <AlertDialogTitle>Delete the database from before 0.1.0?</AlertDialogTitle>
++                <AlertDialogTitle>
++                  <T>Delete the database from before 0.1.0?</T>
++                </AlertDialogTitle>
 +                <AlertDialogDescription>
-+                  Frees {formatMiB(bytes)}. Your threads and settings are already in the current
-+                  database. T3 Code versions before 0.1.0 will start with no threads or settings.
++                  <T>
++                    Frees <Var>{amount}</Var>. Your threads and settings are already in the current
++                    database. T3 Code versions before 0.1.0 will start with no threads or settings.
++                  </T>
 +                </AlertDialogDescription>
 +              </AlertDialogHeader>
 +              <AlertDialogFooter>
-+                <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
++                <AlertDialogClose render={<Button variant="outline" />}>
++                  <T>Cancel</T>
++                </AlertDialogClose>
 +                <Button variant="destructive" onClick={() => void start()}>
-+                  Delete database
++                  <T>Delete database</T>
 +                </Button>
 +              </AlertDialogFooter>
 +            </AlertDialogPopup>
@@ -250,10 +264,10 @@ index b4668a07f2..ef2f2a38c0 100644
 +  );
 +}
 diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
-index 25339cb321..cd6cbdc39e 100644
+index 77a523c036..f9520b8817 100644
 --- a/packages/contracts/src/ipc.ts
 +++ b/packages/contracts/src/ipc.ts
-@@ -1175,6 +1175,12 @@ export interface DesktopBridge {
+@@ -1206,6 +1206,12 @@ export interface DesktopBridge {
    /** With a version, installs only that downloaded build. */
    installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
    onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;

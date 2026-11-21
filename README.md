@@ -28,6 +28,8 @@ separate app, so it does not move the previous app's settings or history from
 The Electron desktop runs inside Flatpak and starts its matching server on the
 host directly from the installed package, without copying the bundled runtime.
 Agents, terminals, Git, and project processes use the normal host environment.
+Turning telemetry off with `T3CODE_TELEMETRY_ENABLED=false` in your shell
+config applies to the app as well as its server.
 T3 Code's settings, history, and cache stay in
 `~/.var/app/com.t3tools.t3code/`.
 

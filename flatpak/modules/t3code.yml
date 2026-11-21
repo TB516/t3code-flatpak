@@ -68,8 +68,8 @@ test-commands:
 sources:
   - type: git
     url: https://github.com/pingdotgg/t3code.git
-    tag: v0.1.10
-    commit: 7d32075e3757ded707914e2450c3e392a9665765
+    tag: v0.1.11
+    commit: 59651c1761f6c63e9b6056839067066968e6a406
     x-checker-data:
       type: json
       url: https://api.github.com/repos/pingdotgg/t3code/releases/latest
@@ -94,6 +94,7 @@ sources:
       - ../../patches/0014-flatpak-managed-policy.patch
       - ../../patches/0015-flatpak-browser-import.patch
       - ../../patches/0016-flatpak-prebuilt-pty.patch
+      - ../../patches/0017-flatpak-primary-paste.patch
     use-git: true
   - type: dir
     path: ../package

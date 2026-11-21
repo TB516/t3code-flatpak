@@ -19,6 +19,16 @@
   <launchable type="desktop-id">com.t3tools.t3code.desktop</launchable>
   <url type="homepage">https://t3.codes</url>
   <releases>
+    <release version="0.1.11" date="2026-11-20">
+      <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.11</url>
+      <description>
+        <p>Update to T3 Code 0.1.11.</p>
+        <p>Middle-click paste now follows your desktop's setting: GNOME's
+        choice is read through the settings portal, and other desktops keep it
+        on unless they turn it off themselves. Turning telemetry off in your
+        shell config now also stops the app's T3 Connect connection traces.</p>
+      </description>
+    </release>
     <release version="0.1.10" date="2026-11-17">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.10</url>
       <description>

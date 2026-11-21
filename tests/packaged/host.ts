@@ -53,7 +53,8 @@ function installFakeCommand(target: string) {
 
 /**
  * Host tools the app should only reach outside the sandbox. Agents, Tailscale and VS Code
- * come from the login shell's PATH, and ssh from the host service's default PATH.
+ * come from the login shell's PATH, and ssh from the host service's default PATH. The login
+ * shell also opts out of telemetry, which only it sets.
  */
 export function installFakeHostCommands() {
   for (const name of ["claude", "codex", "tailscale", "code"]) {
@@ -61,7 +62,10 @@ export function installFakeHostCommands() {
   }
   installFakeCommand("/usr/local/bin/ssh");
   for (const file of [".profile", ".bashrc"]) {
-    fs.appendFileSync(path.join(os.homedir(), file), `export PATH=${LOGIN_BIN}:$PATH\n`);
+    fs.appendFileSync(
+      path.join(os.homedir(), file),
+      `export PATH=${LOGIN_BIN}:$PATH\nexport T3CODE_TELEMETRY_ENABLED=false\n`,
+    );
   }
 }
 

@@ -112,6 +112,14 @@ appTest("finds agent CLIs that only the host login shell knows", async () => {
   );
 });
 
+appTest("honors the login shell's telemetry opt-out in the window", async () => {
+  type Bridge = { desktopBridge: { getRelayTelemetryEnabled(): boolean | null } };
+  const enabled = await page.evaluate(() =>
+    (window as unknown as Bridge).desktopBridge.getRelayTelemetryEnabled(),
+  );
+  assert.equal(enabled, false);
+});
+
 appTest("leaves updates to Flatpak and offers no host installs", async () => {
   const about = await openSettings(page, "about");
   await about.getByText("Updates are managed by Flatpak.").first().waitFor();

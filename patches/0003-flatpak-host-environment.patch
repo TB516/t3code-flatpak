@@ -1,5 +1,5 @@
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
-index 7808682dfd..34438f15b3 100644
+index 621c5c6417..6b3bde0694 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.test.ts
 @@ -184,6 +184,37 @@ function runShellEnvironment(input: {
@@ -37,11 +37,11 @@ index 7808682dfd..34438f15b3 100644
 +    },
 +  );
 +
-   it.effect("does not wait for discovery when the cache is missing", () =>
-     Effect.gen(function* () {
-       const started = yield* Deferred.make<void>();
+   it.effect.each([
+     { platform: "linux" as const, runtime: { APPDIR: "/opt/t3.AppDir/" }, scrub: true },
+     { platform: "linux" as const, runtime: { APPIMAGE: "/opt/T3.AppImage" }, scrub: true },
 diff --git a/apps/desktop/src/shell/DesktopShellEnvironment.ts b/apps/desktop/src/shell/DesktopShellEnvironment.ts
-index f2a92069f0..a5dab8d7a5 100644
+index 8d046fc5ca..3b35a94c60 100644
 --- a/apps/desktop/src/shell/DesktopShellEnvironment.ts
 +++ b/apps/desktop/src/shell/DesktopShellEnvironment.ts
 @@ -26,6 +26,7 @@ import * as Stream from "effect/Stream";
@@ -52,7 +52,7 @@ index f2a92069f0..a5dab8d7a5 100644
  import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
  
  type EnvironmentPatch = Record<string, string>;
-@@ -656,6 +657,15 @@ const CACHED_ENV_NAMES = [
+@@ -664,6 +665,16 @@ const CACHED_ENV_NAMES = [
  /** @public */
  export const make = Effect.gen(function* () {
    const environment = yield* DesktopEnvironment.DesktopEnvironment;
@@ -62,6 +62,7 @@ index f2a92069f0..a5dab8d7a5 100644
 +      installIntoProcess: Effect.succeed(false),
 +      awaitDiscovery: Effect.succeed(false),
 +      awaitUserShellDiscovery: Effect.succeed(false),
++      discoveryFinished: Effect.succeed(true),
 +      updates: Stream.empty,
 +    });
 +  }
