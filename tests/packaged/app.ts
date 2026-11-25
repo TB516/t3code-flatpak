@@ -78,9 +78,15 @@ export async function closeApp(page: Page): Promise<void> {
   await waitUntil("the app and its host server to exit", () => appProcesses().length === 0, 30_000);
 }
 
-/** Every process running the packaged binary, inside or outside the sandbox. */
+/**
+ * Every process running the packaged binary, inside or outside the sandbox.
+ * Exited children of the host server outlive it as zombies here, since the container's
+ * first process never reaps orphans the way a desktop session does.
+ */
 export function appProcesses(): number[] {
-  return processes().filter((pid) => readProc(pid, "comm").trim() === "t3code");
+  return processes().filter(
+    (pid) => readProc(pid, "comm").trim() === "t3code" && processState(pid) !== "Z",
+  );
 }
 
 /** The T3 server the desktop starts for itself. */
@@ -100,6 +106,12 @@ function processes(): number[] {
     .readdirSync("/proc")
     .filter((entry) => /^\d+$/.test(entry))
     .map(Number);
+}
+
+/** proc(5) state; the command name before it is in parentheses and may contain ") ". */
+function processState(pid: number): string | undefined {
+  const stat = readProc(pid, "stat");
+  return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[0];
 }
 
 function readProc(pid: number, file: string): string {

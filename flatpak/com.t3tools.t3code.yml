@@ -35,6 +35,7 @@ finish-args:
   - --filesystem=~/.ssh/known_hosts:ro
   # Read host browser profiles for upstream cookie import.
   - --filesystem=~/.config/google-chrome:ro
+  - --filesystem=~/.config/chromium:ro
   - --filesystem=~/.config/microsoft-edge:ro
   - --filesystem=~/.config/BraveSoftware/Brave-Browser:ro
   - --filesystem=~/.config/vivaldi:ro

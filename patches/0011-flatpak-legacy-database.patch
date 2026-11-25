@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/ipc/DesktopIpcHandlers.ts b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-index a045fd5853..12c0cca32c 100644
+index 1827e3a3d7..98729ca764 100644
 --- a/apps/desktop/src/ipc/DesktopIpcHandlers.ts
 +++ b/apps/desktop/src/ipc/DesktopIpcHandlers.ts
-@@ -89,6 +89,12 @@ import {
+@@ -95,6 +95,12 @@ import {
    addCliCommandToPath,
  } from "./methods/cliCommand.ts";
  
@@ -15,7 +15,7 @@ index a045fd5853..12c0cca32c 100644
  export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
    const ipc = yield* DesktopIpc.DesktopIpc;
    yield* installNotificationBadge();
-@@ -98,6 +104,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
+@@ -104,6 +110,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
    yield* ipc.handle(AppActivationIpc.complete);
    yield* ipc.handle(WebLinksIpc.setReady);
  
@@ -26,10 +26,10 @@ index a045fd5853..12c0cca32c 100644
    yield* ipc.handle(completeLegacyLocalStorage);
    yield* ipc.handleSync(getAppBranding);
 diff --git a/apps/desktop/src/ipc/channels.ts b/apps/desktop/src/ipc/channels.ts
-index 82d966d9c0..f2fcfbb5e0 100644
+index 3495b359a1..53121e8ec2 100644
 --- a/apps/desktop/src/ipc/channels.ts
 +++ b/apps/desktop/src/ipc/channels.ts
-@@ -150,5 +150,8 @@ export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-stor
+@@ -154,5 +154,8 @@ export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-stor
  export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
  
  export const RESTART_AUDIO_SERVICE_CHANNEL = "desktop:restart-audio-service";
@@ -99,10 +99,10 @@ index 0000000000..277e1908ca
 +  }),
 +});
 diff --git a/apps/desktop/src/preload.ts b/apps/desktop/src/preload.ts
-index fef6236db0..495f0aa3a1 100644
+index 2586d30773..9809c70f34 100644
 --- a/apps/desktop/src/preload.ts
 +++ b/apps/desktop/src/preload.ts
-@@ -336,6 +336,14 @@ contextBridge.exposeInMainWorld("desktopBridge", {
+@@ -346,6 +346,14 @@ contextBridge.exposeInMainWorld("desktopBridge", {
    downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
    installUpdate: (expectedVersion) =>
      ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL, expectedVersion),
@@ -264,10 +264,10 @@ index b4458c389d..bab711b45a 100644
 +  );
 +}
 diff --git a/packages/contracts/src/ipc.ts b/packages/contracts/src/ipc.ts
-index 77a523c036..f9520b8817 100644
+index adbb28bbf1..f781bde425 100644
 --- a/packages/contracts/src/ipc.ts
 +++ b/packages/contracts/src/ipc.ts
-@@ -1206,6 +1206,12 @@ export interface DesktopBridge {
+@@ -1231,6 +1231,12 @@ export interface DesktopBridge {
    /** With a version, installs only that downloaded build. */
    installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
    onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;

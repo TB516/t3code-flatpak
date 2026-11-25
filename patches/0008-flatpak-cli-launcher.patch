@@ -79,7 +79,7 @@ index b5306a6bb5..afb011e165 100644
    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
    // Read the live env: shell discovery patches PATH after startup, and Windows variable
 diff --git a/apps/desktop/src/app/DesktopCliShim.ts b/apps/desktop/src/app/DesktopCliShim.ts
-index 217f3b327d..fa4d6c482f 100644
+index 0f7e605da6..56ba33b096 100644
 --- a/apps/desktop/src/app/DesktopCliShim.ts
 +++ b/apps/desktop/src/app/DesktopCliShim.ts
 @@ -1,9 +1,11 @@
@@ -94,7 +94,7 @@ index 217f3b327d..fa4d6c482f 100644
  import * as DesktopEnvironment from "./DesktopEnvironment.ts";
  import { makeComponentLogger } from "./DesktopObservability.ts";
  
-@@ -125,7 +127,12 @@ export const launcherPath = (environment: DesktopEnvironment.DesktopEnvironment[
+@@ -146,7 +148,12 @@ export const launcherPath = (environment: DesktopEnvironment.DesktopEnvironment[
  
  export const install = Effect.gen(function* () {
    const environment = yield* DesktopEnvironment.DesktopEnvironment;

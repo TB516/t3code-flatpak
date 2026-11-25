@@ -1,17 +1,16 @@
 diff --git a/apps/desktop/src/preview/BrowserImport/Sources.test.ts b/apps/desktop/src/preview/BrowserImport/Sources.test.ts
-index 9b2c3cb26c..5b924a1fa0 100644
+index 54518f637c..1a6d0040b3 100644
 --- a/apps/desktop/src/preview/BrowserImport/Sources.test.ts
 +++ b/apps/desktop/src/preview/BrowserImport/Sources.test.ts
-@@ -199,7 +199,7 @@ describe("chromiumProcessIsAlive", () => {
- });
- 
- describe("isSourceInstalled", () => {
--  it.effect.each([undefined, "", "relative-config", "relocated", "chrome-override"])(
-+  it.effect.each([undefined, "", "relative-config", "relocated", "chrome-override", "flatpak"])(
-     "discovers Linux Chromium profiles with XDG_CONFIG_HOME=%s",
-     (configHome) =>
-       run(
-@@ -210,7 +210,9 @@ describe("isSourceInstalled", () => {
+@@ -205,6 +205,7 @@ describe("isSourceInstalled", () => {
+     ["chrome", "google-chrome", "relative-config"],
+     ["chrome", "google-chrome", "relocated"],
+     ["chrome", "google-chrome", "chrome-override"],
++    ["chrome", "google-chrome", "flatpak"],
+     ["chromium", "chromium", "relocated"],
+     ["chromium", "chromium", "chrome-override"],
+   ] as const)(
+@@ -218,7 +219,9 @@ describe("isSourceInstalled", () => {
            const xdgConfigHome =
              configHome === "relocated" || configHome === "chrome-override"
                ? path.join(home, "config")
@@ -20,9 +19,9 @@ index 9b2c3cb26c..5b924a1fa0 100644
 +                ? path.join(home, ".var", "app", "com.t3tools.t3code", "config")
 +                : configHome;
            const chromeConfigHome =
-             configHome === "chrome-override" ? path.join(home, ".config") : undefined;
+             configHome === "chrome-override" ? path.join(home, "chrome-config") : undefined;
            const context = yield* sourcePathContext.pipe(
-@@ -218,6 +220,7 @@ describe("isSourceInstalled", () => {
+@@ -226,6 +229,7 @@ describe("isSourceInstalled", () => {
                HOME: home,
                XDG_CONFIG_HOME: xdgConfigHome,
                CHROME_CONFIG_HOME: chromeConfigHome,
@@ -31,7 +30,7 @@ index 9b2c3cb26c..5b924a1fa0 100644
              Effect.provideService(HostProcess.Platform, "linux"),
            );
 diff --git a/apps/desktop/src/preview/BrowserImport/Sources.ts b/apps/desktop/src/preview/BrowserImport/Sources.ts
-index 6ecd546a1a..fb4ad15e4a 100644
+index b8fc14f578..ec49c5edba 100644
 --- a/apps/desktop/src/preview/BrowserImport/Sources.ts
 +++ b/apps/desktop/src/preview/BrowserImport/Sources.ts
 @@ -10,6 +10,8 @@ import * as Stream from "effect/Stream";
@@ -43,7 +42,7 @@ index 6ecd546a1a..fb4ad15e4a 100644
  export type BrowserImportEngine = "chromium" | "firefox" | "safari";
  
  export interface BrowserImportPathContext {
-@@ -298,7 +300,11 @@ export const sourcePathContext = Effect.gen(function* () {
+@@ -309,7 +311,11 @@ export const sourcePathContext = Effect.gen(function* () {
    const platform = yield* HostProcess.Platform;
    const environment = yield* HostProcess.Environment;
    const home = environment.HOME ?? environment.USERPROFILE ?? "";

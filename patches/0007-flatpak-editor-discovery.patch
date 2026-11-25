@@ -1,8 +1,8 @@
 diff --git a/apps/server/src/process/externalLauncher.test.ts b/apps/server/src/process/externalLauncher.test.ts
-index 8ce873733d..edacc8fe36 100644
+index 83e140161a..c9d321b3ce 100644
 --- a/apps/server/src/process/externalLauncher.test.ts
 +++ b/apps/server/src/process/externalLauncher.test.ts
-@@ -592,6 +592,55 @@ for (const [replacement, verb, handler, target, expected] of [
+@@ -641,6 +641,55 @@ for (const [replacement, verb, handler, target, expected] of [
    );
  }
  
@@ -59,7 +59,7 @@ index 8ce873733d..edacc8fe36 100644
    "reveals a WSL file in Windows File Explorer through its UNC path",
    () =>
 diff --git a/apps/server/src/process/externalLauncher.ts b/apps/server/src/process/externalLauncher.ts
-index caa6664a1b..c98b528f59 100644
+index 09a53a51a2..bcf3d53805 100644
 --- a/apps/server/src/process/externalLauncher.ts
 +++ b/apps/server/src/process/externalLauncher.ts
 @@ -124,6 +124,67 @@ const CommandLookupEnvConfig = Config.all({
