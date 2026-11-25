@@ -31,7 +31,7 @@ env:
 
 jobs:
   publish:
-    name: Build and publish
+    name: Build signed repository
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     defaults:
@@ -44,9 +44,6 @@ jobs:
       # image's layered filesystem. A volume starts as a copy of the image's installation.
       volumes:
         - /var/lib/flatpak
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Check out repository
@@ -127,6 +124,15 @@ jobs:
         with:
           path: ${{ env.PAGES_DIR }}
 
+  # A separate job, so a failed deploy can be re-run without rebuilding the repository.
+  deploy:
+    name: Deploy GitHub Pages
+    needs: publish
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
