@@ -38,7 +38,9 @@ The Flatpak can read `~/.ssh/config`, `~/.ssh/config.d`, and
 `~/.ssh/known_hosts` to populate its connection list, while private keys stay
 outside the sandbox.
 
-Preview tab downloads save to your Downloads folder. On KDE, T3 Code can store
+Preview tab downloads save to your Downloads folder. Preview pages that ask
+for your camera go through your desktop's camera permission prompt, which needs
+PipeWire and a desktop portal with camera support. On KDE, T3 Code can store
 its secrets in KWallet. With Network access on, Settings shows the host's
 Tailscale HTTPS address. A managed policy at `/etc/t3code/policy.json` applies
 to both the app and its host server.

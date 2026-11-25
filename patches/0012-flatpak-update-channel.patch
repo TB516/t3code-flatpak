@@ -1,8 +1,8 @@
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index 44777e1c70..3187bf1b8b 100644
+index 0218143845..ba703fb493 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
-@@ -95,6 +95,11 @@ describe("DesktopUpdates", () => {
+@@ -106,6 +106,11 @@ describe("DesktopUpdates", () => {
        const result = yield* updates.check("manual");
        assert.isFalse(result.checked);
        assert.equal(harness.checkCount(), 0);
@@ -15,10 +15,10 @@ index 44777e1c70..3187bf1b8b 100644
        Effect.scoped,
        Effect.provide(harness.layer),
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index 3ca3eacfce..a0a883b14e 100644
+index 323bfa8579..86bcbfd035 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
-@@ -1347,6 +1347,9 @@ export const make = Effect.gen(function* () {
+@@ -1412,6 +1412,9 @@ export const make = Effect.gen(function* () {
        options?: { readonly minimumVersion?: string | undefined },
      ) {
        yield* Effect.annotateCurrentSpan({ channel: nextChannel });
@@ -29,10 +29,10 @@ index 3ca3eacfce..a0a883b14e 100644
          return yield* new DesktopUpdateChannelManagedError({
            channel: nextChannel,
 diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
-index e0a1241784..638d8c178a 100644
+index 10d4e2c6fa..ecbdc6a0e4 100644
 --- a/apps/web/src/components/settings/SettingsPanels.tsx
 +++ b/apps/web/src/components/settings/SettingsPanels.tsx
-@@ -389,6 +389,8 @@ function AboutVersionSection() {
+@@ -401,6 +401,8 @@ function AboutVersionSection() {
                    <T>Review</T>
                  </Button>
                </>
@@ -41,7 +41,7 @@ index e0a1241784..638d8c178a 100644
              ) : (
                gt(
                  "Switches this app and every connected machine whose database the target release supports.",
-@@ -399,6 +401,9 @@ function AboutVersionSection() {
+@@ -411,6 +413,9 @@ function AboutVersionSection() {
            control={
              <Select
                value={selectedUpdateChannel}
@@ -51,7 +51,7 @@ index e0a1241784..638d8c178a 100644
                onValueChange={(value) => {
                  if (value !== selectedUpdateChannel) {
                    setSwitchChannel(value as DesktopUpdateChannel);
-@@ -409,7 +414,9 @@ function AboutVersionSection() {
+@@ -421,7 +426,9 @@ function AboutVersionSection() {
                  size="sm"
                  className="w-full sm:w-40"
                  aria-label={gt("Update track")}

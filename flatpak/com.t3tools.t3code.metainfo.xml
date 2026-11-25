@@ -21,7 +21,12 @@
   <releases>
     <release version="0.1.12" date="2026-11-25">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.12</url>
-      <description></description>
+      <description>
+        <p>Update to T3 Code 0.1.12.</p>
+        <p>Pages in the browser panel can use your camera through your
+        desktop's camera permission prompt, and cookies can be imported from
+        Chromium.</p>
+      </description>
     </release>
     <release version="0.1.11" date="2026-11-20">
       <url type="details">https://github.com/pingdotgg/t3code/releases/tag/v0.1.11</url>

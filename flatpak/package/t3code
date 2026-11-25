@@ -42,4 +42,6 @@ if [ -n "$host_path" ]; then
     export T3CODE_FLATPAK_HOST_PATH="$host_path"
 fi
 
-exec zypak-wrapper /app/t3code/t3code "$@"
+# The sandbox has no camera devices, so the browser panel asks for the camera
+# through the desktop's camera portal instead.
+exec zypak-wrapper /app/t3code/t3code --enable-features=WebRtcPipeWireCamera "$@"
