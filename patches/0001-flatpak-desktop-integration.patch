@@ -55,10 +55,10 @@ index 200745f111..b0f21ccc7d 100644
      Effect.gen(function* () {
        const environment = yield* makeEnvironment({
 diff --git a/apps/desktop/src/app/DesktopEnvironment.ts b/apps/desktop/src/app/DesktopEnvironment.ts
-index d5fed4b228..05f90aedf5 100644
+index d012b5afe6..6ab6e88cd1 100644
 --- a/apps/desktop/src/app/DesktopEnvironment.ts
 +++ b/apps/desktop/src/app/DesktopEnvironment.ts
-@@ -167,10 +167,14 @@ const make = Effect.fn("desktop.environment.make")(function* (
+@@ -168,10 +168,14 @@ const make = Effect.fn("desktop.environment.make")(function* (
      input.isPackaged && input.platform === "win32"
        ? path.join(input.resourcesPath, "server.asar")
        : appRoot;
@@ -74,7 +74,7 @@ index d5fed4b228..05f90aedf5 100644
    const displayName = branding.displayName;
    const stateDir = resolveDesktopStateDir({
      baseDir,
-@@ -230,7 +234,9 @@ const make = Effect.fn("desktop.environment.make")(function* (
+@@ -232,7 +236,9 @@ const make = Effect.fn("desktop.environment.make")(function* (
      appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () =>
        isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code",
      ),
