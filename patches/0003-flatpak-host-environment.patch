@@ -70,7 +70,7 @@ index c897e59bf5..642a992246 100644
    const path = yield* Path.Path;
    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 diff --git a/apps/desktop/src/updates/DesktopUpdates.test.ts b/apps/desktop/src/updates/DesktopUpdates.test.ts
-index c1115f314e..0218143845 100644
+index e72028b747..06d8ffd82c 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.test.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.test.ts
 @@ -1,6 +1,6 @@
@@ -111,7 +111,7 @@ index c1115f314e..0218143845 100644
      Effect.gen(function* () {
        const linuxState = (packageType: string | undefined) =>
 diff --git a/apps/desktop/src/updates/DesktopUpdates.ts b/apps/desktop/src/updates/DesktopUpdates.ts
-index 32e64502d9..323bfa8579 100644
+index b6a9aa0ac6..397a3ae5a7 100644
 --- a/apps/desktop/src/updates/DesktopUpdates.ts
 +++ b/apps/desktop/src/updates/DesktopUpdates.ts
 @@ -1,3 +1,4 @@
@@ -119,7 +119,7 @@ index 32e64502d9..323bfa8579 100644
  import {
    DESKTOP_UPDATE_RESTART_MARKER_FILE,
    DESKTOP_UPDATE_IN_PROGRESS_MARKER_FILE,
-@@ -352,6 +353,9 @@ function getAutoUpdateDisabledReason(args: {
+@@ -355,6 +356,9 @@ function getAutoUpdateDisabledReason(args: {
    disabledByEnv: boolean;
    hasUpdateFeedConfig: boolean;
  }): string | null {

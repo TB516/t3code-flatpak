@@ -1,8 +1,8 @@
 diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
-index 1d334ad98e..e5b0bdc023 100644
+index b6bb677fb4..9130fb1748 100644
 --- a/scripts/build-desktop-artifact.ts
 +++ b/scripts/build-desktop-artifact.ts
-@@ -2948,6 +2948,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
+@@ -2955,6 +2955,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
    if (platform === "linux") {
      // Pin the static AppImage runtime so hosts with only FUSE 3 do not need libfuse2.
      buildConfig.toolsets = { appimage: "1.0.3" };
